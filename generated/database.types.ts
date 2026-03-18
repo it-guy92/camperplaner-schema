@@ -6,7 +6,7 @@
  * 
  * Source: https://github.com/it-guy92/camperplaner-schema
  * Generated: 2026-03-18
- * Migration Head: 20260317210003_source_family_constraints.sql
+ * Migration Head: 20260318_fix_get_place_source_bundle_signature.sql
  * 
  * To regenerate: node scripts/generate-types.js
  */
@@ -2263,7 +2263,12 @@ export interface Database {
       }
     }
     Functions: {
-      [_ in never]: never
+      get_place_source_bundle: {
+        Args: {
+          place_id: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       factor_type: 'totp' | 'webauthn' | 'phone'
