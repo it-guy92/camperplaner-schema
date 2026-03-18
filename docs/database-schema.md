@@ -1,458 +1,877 @@
-# CamperPlaner Database Schema (Schema Repo - Canonical)
+# CamperPlaner Database Schema
 
-> **Location:** This is the canonical source. Product repo references this file.
-> **Source:** `apps/web/src/lib/database.types.ts` (generated from live Supabase)
-> **Migration:** Phase 1 Enrichment Schema (2026-03-16)
+> **Location:** This is the canonical source of truth for the CamperPlaner database schema.
+> **Generated:** 2026-03-18
+> **Migration Head:** 20260318_fix_get_place_source_bundle_signature.sql
 
 ---
 
 ## Schema Overview
 
-- **38 User Tables** after Phase 1 enrichment migration
-- **4 User Views** (excluding PostGIS system views)
-- **20+ Enums**
-- **11 New Tables** (3 parent + 8 child)
-- **14 New Columns** (7 in place_enrichment, 7 in enrichment_jobs)
+| Metric | Count |
+|--------|-------|
+| **Total Tables** | 45 |
+| **User Tables** | 38 |
+| **System Tables** | 7 (PostGIS) |
+| **Views** | 6 |
+| **Enums** | 13 |
+| **RPC Functions** | 1 |
 
 ---
 
 ## Tables by Domain
 
-### User & Trip Management
-- `profiles` - User profiles extending auth.users
-- `trips` - Trip/route definitions
-- `trip_stops` - Individual stops within trips
-- `trip_reminders` - Trip reminder notifications
-- `vehicle_profiles` - User vehicle configurations
-- `favorites` - User saved favorites
+### 1. User & Trip Management
 
-### Places & Campsites (Canonical Data)
-- `places` - Main places table (canonical data)
-- `campsites_cache` - Cached campsite data with Google Places enrichment
-- `campsite_prices` - User-submitted price data
-- `campsite_reviews` - User reviews and ratings
-- `place_enrichment` - Place enrichment data (includes 7 new runtime fields)
-- `place_duplicate_candidates` - Potential duplicate detection
-- `google_places_cache` - Cached Google Places API responses
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `profiles` | User profiles extending auth.users | `id` (uuid) |
+| `trips` | Trip/route definitions | `id` (uuid) |
+| `trip_stops` | Individual stops within trips | `id` (uuid) |
+| `trip_reminders` | Trip reminder notifications | `id` (uuid) |
+| `vehicle_profiles` | User vehicle configurations | `id` (uuid) |
+| `favorites` | User saved favorites | `id` (uuid) |
 
-### Import & Queue System
-- `countries` - Country definitions for imports
-- `country_import_status` - Import status tracking per country
-- `osm_source` - OSM source data tracking
-- `osm_import_queue` - OSM import work queue
-- `osm_import_jobs` - OSM import job tracking
-- `osm_import_runs` - OSM import run history
-- `osm_refresh_jobs` - OSM data refresh jobs
-- `osm_type_transitions` - OSM place type transition rules
-- `import_snapshot` - Import snapshots for recovery
-- `description_generation_jobs` - LLM description generation queue
-- `enrichment_jobs` - Data enrichment job queue (includes 7 new typed columns)
-- `website_scraping_jobs` - Website scraping job queue
+### 2. Places & Campsites (Core Data)
 
-### Audit & Logging
-- `app_errors` - Application error tracking
-- `app_settings` - Application configuration
-- `settings_audit_log` - Settings change audit trail
-- `cutover_audit_log` - Database cutover audit trail
-- `cutover_metric_snapshots` - Cutover performance metrics
-- `cutover_runtime_flags` - Cutover feature flags
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `places` | Main places table with canonical data | `id` (bigint) |
+| `campsites_cache` | Cached campsite data with Google Places enrichment | `id` (uuid) |
+| `campsite_prices` | User-submitted price data | `id` (uuid) |
+| `campsite_reviews` | User reviews and ratings | `id` (uuid) |
+| `place_enrichment` | Place enrichment data and LLM processing | `id` (bigint) |
+| `place_duplicate_candidates` | Potential duplicate detection | `id` (bigint) |
+| `google_places_cache` | Cached Google Places API responses | `id` (uuid) |
 
----
+### 3. Import & Queue System
 
-## Phase 1: Enrichment Schema (NEW)
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `countries` | Country definitions for imports | `iso_code` (text) |
+| `country_import_status` | Import status tracking per country | `id` (uuid) |
+| `osm_source` | OSM source data tracking | `id` (bigint) |
+| `osm_import_queue` | OSM import work queue | `id` (bigint) |
+| `osm_import_jobs` | OSM import job tracking | `id` (uuid) |
+| `osm_import_runs` | OSM import run history | `id` (bigint) |
+| `osm_refresh_jobs` | OSM data refresh jobs | `id` (bigint) |
+| `osm_type_transitions` | OSM place type transition rules | `id` (bigint) |
+| `import_snapshot` | Import snapshots for recovery | `id` (uuid) |
+| `description_generation_jobs` | LLM description generation queue | `id` (uuid) |
+| `enrichment_jobs` | Data enrichment job queue | `id` (bigint) |
+| `website_scraping_jobs` | Website scraping job queue | `id` (uuid) |
 
-### Parent Tables (Source Families)
+### 4. Audit & Logging
 
-#### `place_llm_enrichments` - LLM Output Storage
-Stores structured LLM-generated enrichment data. This is the authoritative storage for AI-generated content.
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `app_errors` | Application error tracking | `id` (uuid) |
+| `app_settings` | Application configuration | `id` (uuid) |
+| `settings_audit_log` | Settings change audit trail | `id` (uuid) |
+| `cutover_audit_log` | Database cutover audit trail | `id` (bigint) |
+| `cutover_metric_snapshots` | Cutover performance metrics | `id` (bigint) |
+| `cutover_runtime_flags` | Cutover feature flags | `key` (text) |
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `place_id` | bigint | FK to places.id |
-| `job_id` | bigint | FK to enrichment_jobs.id |
-| `provider` | text | LLM provider (openai, anthropic) |
-| `model` | text | Model identifier (gpt-4, claude-3) |
-| `prompt_version` | text | Prompt template version |
-| `summary_de` | text | German summary generated by LLM |
-| `confidence` | numeric(3,2) | Confidence score (0-1) |
-| `hallucination_risk` | numeric(3,2) | Hallucination risk score (0-1) |
-| `token_input` | integer | Prompt tokens used |
-| `token_output` | integer | Completion tokens used |
-| `cost_usd` | numeric(10,4) | Cost in USD |
-| `status` | text | pending/processing/completed/failed |
-| `is_current` | boolean | Whether this is the current valid enrichment |
-| `created_at` | timestamptz | Record creation time |
+### 5. Phase 1: Enrichment Schema (NEW)
 
-#### `place_source_evidence_runs` - Evidence Collection Audit
-Tracks evidence collection from web sources during enrichment jobs.
+#### Parent Tables (Source Families)
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `place_id` | bigint | FK to places.id |
-| `job_id` | bigint | FK to enrichment_jobs.id |
-| `worker_id` | text | Worker that performed collection |
-| `attempt_number` | integer | Retry attempt number |
-| `collection_status` | text | pending/processing/completed/failed |
-| `source_urls` | jsonb | Array of URLs fetched |
-| `source_evidence` | jsonb | Scraped content from sources |
-| `evidence_markers` | jsonb | Trust markers for validation |
-| `trusted_source_count` | integer | Count of trusted sources |
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `place_llm_enrichments` | LLM output storage | `id` (bigint) |
+| `place_source_evidence_runs` | Evidence collection audit | `id` (bigint) |
+| `place_google_sources` | Google Places API cache | `id` (bigint) |
 
-#### `place_google_sources` - Google Places API Cache
-Caches Google Places API responses with structured data.
+#### Child Tables (LLM Enrichments)
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `place_id` | bigint | FK to places.id |
-| `google_place_id` | text | Google Places API place_id |
-| `name` | text | Place name |
-| `formatted_address` | text | Full address |
-| `phone` | text | Contact phone |
-| `website` | text | Website URL |
-| `rating` | numeric(2,1) | Rating (0-5) |
-| `review_count` | integer | Number of reviews |
-| `business_status` | text | Business operational status |
-| `lat` | numeric | Latitude |
-| `lon` | numeric | Longitude |
-| `raw_payload` | jsonb | Full Google API response |
-| `fetched_at` | timestamptz | When data was fetched |
-| `expires_at` | timestamptz | Cache expiration |
-| `is_current` | boolean | Whether this is current |
+| Table | Description | Primary Key | Parent |
+|-------|-------------|-------------|--------|
+| `place_llm_facts` | Individual LLM-extracted facts | `id` (bigint) | place_llm_enrichments |
+| `place_llm_sources` | Sources cited by LLM | `id` (bigint) | place_llm_enrichments |
+| `place_llm_evidence_markers` | Trust markers for LLM output | `id` (bigint) | place_llm_enrichments |
 
-### Child Tables (LLM Enrichments)
+#### Child Tables (Evidence Collection)
 
-#### `place_llm_facts` - Individual LLM-Extracted Facts
-Stores individual facts extracted by LLM. Follows the Amenity Facts Pattern (hard facts in typed columns, not JSONB).
+| Table | Description | Primary Key | Parent |
+|-------|-------------|-------------|--------|
+| `place_evidence_sources` | Individual fetched sources | `id` (bigint) | place_source_evidence_runs |
+| `place_evidence_markers` | Evidence markers from sources | `id` (bigint) | place_source_evidence_runs |
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `llm_enrichment_id` | bigint | FK to place_llm_enrichments.id |
-| `field_name` | text | Field name (e.g., has_electricity, phone) |
-| `value_text` | text | Value as text |
-| `value_type` | text | string/boolean/number/array/object |
-| `confidence` | numeric(3,2) | Fact confidence (0-1) |
-| `provenance_kind` | text | llm_extracted/source_verified/user_confirmed |
+#### Child Tables (Google Sources)
 
-#### `place_llm_sources` - Sources Cited by LLM
-Tracks sources the LLM used to generate enrichment.
+| Table | Description | Primary Key | Parent |
+|-------|-------------|-------------|--------|
+| `place_google_reviews` | Individual Google reviews | `id` (bigint) | place_google_sources |
+| `place_google_photos` | Google place photos | `id` (bigint) | place_google_sources |
+| `place_google_types` | Google place types | `id` (bigint) | place_google_sources |
+| `place_google_amenities` | Google amenities data | `id` (bigint) | place_google_sources |
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `llm_enrichment_id` | bigint | FK to place_llm_enrichments.id |
-| `source_url` | text | Full URL of source |
-| `source_domain` | text | Domain extracted from URL |
-| `source_kind` | text | website/google_reviews/osm/user_submission/other |
-| `trusted` | boolean | Whether source is in trusted domains |
-| `relevance_score` | numeric(3,2) | Relevance score (0-1) |
+### 6. System/Cache Tables
 
-#### `place_llm_evidence_markers` - Trust Markers
-Stores citations and trust markers for LLM output.
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `llm_enrichment_id` | bigint | FK to place_llm_enrichments.id |
-| `field_name` | text | Field this marker relates to |
-| `marker_text` | text | Quote or citation text |
-| `marker_type` | text | citation/quote/summary/confidence |
-| `confidence` | numeric(3,2) | Marker confidence (0-1) |
-
-### Child Tables (Evidence Collection)
-
-#### `place_evidence_sources` - Individual Fetched Sources
-Tracks each source URL fetched during evidence collection.
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `evidence_run_id` | bigint | FK to place_source_evidence_runs.id |
-| `source_url` | text | URL that was fetched |
-| `source_domain` | text | Domain of the URL |
-| `fetch_status` | text | pending/fetching/success/failed/timeout/blocked |
-| `http_status` | integer | HTTP response code |
-| `trusted` | boolean | Whether domain is trusted |
-| `fetched_at` | timestamptz | When URL was fetched |
-
-#### `place_evidence_markers` - Evidence from Sources
-Stores evidence markers extracted from fetched sources.
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `evidence_run_id` | bigint | FK to place_source_evidence_runs.id |
-| `field_name` | text | Field this evidence supports |
-| `marker_text` | text | Evidence text |
-| `marker_type` | text | extract/quote/summary/pattern_match |
-| `confidence` | numeric(3,2) | Evidence confidence (0-1) |
-| `source_url` | text | URL where evidence was found |
-
-### Child Tables (Google Sources)
-
-#### `place_google_reviews` - Individual Google Reviews
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `google_source_id` | bigint | FK to place_google_sources.id |
-| `author_name` | text | Reviewer name |
-| `rating` | integer | Star rating (1-5) |
-| `review_text` | text | Review content |
-| `review_time` | timestamptz | When review was posted |
-
-#### `place_google_photos` - Google Place Photos
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `google_source_id` | bigint | FK to place_google_sources.id |
-| `photo_reference` | text | Google photo token |
-| `width` | integer | Photo width |
-| `height` | integer | Photo height |
-
-#### `place_google_types` - Google Place Types
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | bigserial | Primary key |
-| `google_source_id` | bigint | FK to place_google_sources.id |
-| `google_type` | text | Google type (campground, rv_park) |
-| `is_primary` | boolean | Whether this is primary type |
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `google_refresh_claims` | Google Places refresh claim tracking | `place_id` (uuid) |
 
 ---
 
-## New Columns in Existing Tables
+## Detailed Table Schemas
 
-### `place_enrichment` - 7 New Runtime Fields
-These fields move from runtime-only to formal schema (Phase 1).
+### User & Trip Tables
 
-| Column | Type | Purpose | JSONB Justification |
-|--------|------|---------|---------------------|
-| `source_evidence` | jsonb | Evidence collection logging | Evidence storage - arbitrary content varies by URL |
-| `evidence_markers` | jsonb | Trust markers for validation | Evidence storage - variable structure |
-| `collection_status` | text | Evidence collection status | N/A - typed column |
-| `failure_classification` | text | Error categorization | N/A - typed column |
-| `provider_attempts` | jsonb | Retry tracking | Debug metadata - non-operational |
-| `job_cost_usd` | numeric(10,4) | Cost tracking | N/A - typed column |
-| `enrichment_schema_version` | text | Schema versioning | N/A - typed column |
+#### `profiles`
+User profiles extending auth.users.
 
-### `enrichment_jobs` - 7 New Typed Columns + Metadata
-These columns support filtering, retry logic, and dashboards while preserving context JSONB.
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Reference to auth.users.id |
+| `email` | text | NOT NULL | User email address |
+| `role` | text | NOT NULL | 'user' or 'admin' |
+| `created_at` | timestamptz | DEFAULT NOW() | Record creation time |
+| `full_name` | text | NULL | User's full name |
+| `home_city` | text | NULL | User's home city |
+| `home_city_coords` | jsonb | NULL | Home city coordinates |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT NOW() | Last update time |
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `classification` | text | Error/failure classification (rate_limit, timeout, etc.) |
-| `source_state` | text | Source processing state (fetched, enriched, failed_validation) |
-| `worker_id` | text | Claiming worker identifier |
-| `attempt_number` | integer | Current attempt count |
-| `last_error_code` | text | Structured error code (OPENAI_RATE_LIMIT, etc.) |
-| `last_error_message` | text | Human-readable error message |
-| `canonical_place_id` | uuid | Reference for queue flow |
-| `metadata` | jsonb | Optional metadata bridge (non-operational data) |
+#### `trips`
+User trips/routes.
 
----
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique trip identifier |
+| `user_id` | uuid | FK → profiles.id, NOT NULL | Trip owner |
+| `start_location` | text | NOT NULL | Starting location name |
+| `end_location` | text | NOT NULL | Ending location name |
+| `start_date` | date | NOT NULL | Trip start date |
+| `end_date` | date | NOT NULL | Trip end date |
+| `total_distance` | numeric | NOT NULL | Total trip distance |
+| `total_cost` | numeric | NOT NULL | Total trip cost |
+| `fuel_cost` | numeric | NOT NULL, DEFAULT 0 | Fuel cost estimate |
+| `toll_cost` | numeric | NOT NULL, DEFAULT 0 | Toll cost estimate |
+| `is_shared` | boolean | DEFAULT false | Whether trip is shared |
+| `share_token` | uuid | NULL | Token for sharing |
+| `shared_at` | timestamptz | NULL | When trip was shared |
+| `start_location_geo` | geography | NULL | Start location as geography |
+| `end_location_geo` | geography | NULL | End location as geography |
+| `start_coords` | jsonb | DEFAULT '{}' | Start coordinates |
+| `end_coords` | jsonb | DEFAULT '{}' | End coordinates |
+| `route_geometry` | jsonb | NULL | Full route geometry |
+| `name` | text | NULL | Trip name |
+| `created_at` | timestamptz | DEFAULT NOW() | Creation time |
 
-## JSONB Justification
+#### `trip_stops`
+Stops within trips.
 
-Per the Phase 1 Compatibility Decisions, JSONB columns are allowed ONLY for specific use cases:
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique stop identifier |
+| `trip_id` | uuid | FK → trips.id, NOT NULL | Parent trip |
+| `day_number` | integer | NOT NULL | Day number in trip |
+| `location_name` | text | NOT NULL | Location name |
+| `coordinates` | jsonb | NOT NULL | Stop coordinates |
+| `cost` | numeric | NOT NULL | Stop cost |
+| `type` | text | NOT NULL | Stop type enum |
+| `name` | text | NULL | Stop name |
+| `rating` | numeric | NULL | User rating |
+| `website` | text | NULL | Website URL |
+| `image` | text | NULL | Image URL |
+| `amenities` | text[] | DEFAULT '{}' | Array of amenities |
+| `order_index` | integer | DEFAULT 0 | Display order |
+| `cost_type` | text | DEFAULT 'per_night' | Cost type enum |
+| `notes` | text | NULL | User notes |
+| `place_id` | text | NULL | Reference to place |
+| `location_geo` | geography | NULL | Geography point |
 
-### Allowed JSONB Columns
+#### `trip_reminders`
+Trip reminder settings.
 
-| Table | Column | Justification |
-|-------|--------|---------------|
-| `place_llm_enrichments` | (no JSONB columns) | All fields are typed |
-| `place_source_evidence_runs` | `source_evidence` | Evidence storage - arbitrary scraped content varies by URL type |
-| `place_source_evidence_runs` | `evidence_markers` | Evidence storage - variable structure from different sources |
-| `place_source_evidence_runs` | `source_urls` | Debug metadata - URL array not used in queries |
-| `place_google_sources` | `raw_payload` | Vendor-specific details - unpredictable Google API response schema |
-| `place_llm_facts` | (no JSONB columns) | All fields are typed per Amenity Facts Pattern |
-| `place_evidence_sources` | (no JSONB columns) | All fields are typed |
-| `place_evidence_markers` | (no JSONB columns) | All fields are typed |
-| `place_enrichment` | `source_evidence` | Evidence storage - arbitrary content |
-| `place_enrichment` | `evidence_markers` | Evidence storage - variable structure |
-| `place_enrichment` | `provider_attempts` | Debug metadata - non-operational tracing |
-| `enrichment_jobs` | `metadata` | Debug metadata - non-operational data |
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `trip_id` | uuid | FK → trips.id, NOT NULL | Parent trip |
+| `user_id` | uuid | FK → profiles.id, NOT NULL | User reference |
+| `reminder_days_before` | integer | NOT NULL | Days before to remind |
+| `is_active` | boolean | NOT NULL, DEFAULT true | Active flag |
+| `last_sent_at` | timestamptz | NULL | Last reminder sent |
+| `created_at` | timestamptz | NOT NULL, DEFAULT NOW() | Creation time |
 
-### JSONB Forbidden Patterns
+#### `vehicle_profiles`
+Saved vehicle configurations.
 
-JSONB is NOT allowed for:
-- Query filters (WHERE clauses) - use typed columns
-- Join conditions (FK relationships) - use typed columns
-- Analytics aggregations (GROUP BY, COUNT) - use typed columns
-- UI display (user-facing text) - use typed columns
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `user_id` | uuid | FK → profiles.id, NOT NULL | Owner |
+| `name` | text | NOT NULL | Profile name |
+| `max_speed` | numeric | NULL | Maximum speed |
+| `height` | numeric | NULL | Vehicle height |
+| `weight` | numeric | NULL | Vehicle weight |
+| `fuel_consumption` | numeric | NULL | Fuel consumption |
+| `is_default` | boolean | NULL | Default profile flag |
+| `created_at` | timestamptz | NOT NULL | Creation time |
 
----
+#### `favorites`
+User saved favorites.
 
-## Amenity Facts Pattern
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `user_id` | uuid | FK → profiles.id, NOT NULL | Owner |
+| `place_id` | uuid | NOT NULL | Place reference |
+| `name` | text | NOT NULL | Display name |
+| `coordinates` | jsonb | NOT NULL | Location coordinates |
+| `type` | text | NOT NULL | Place type |
+| `amenities` | text[] | NULL | Array of amenities |
+| `rating` | numeric | NULL | User rating |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `location_geo` | geography | NULL | Geography point |
 
-The schema enforces that hard factual data (amenities, contact info) MUST be stored in typed columns, NOT JSONB.
+### Places & Campsites Tables
 
-### Correct Pattern
-```sql
--- Typed columns for hard facts
-has_electricity boolean NOT NULL DEFAULT false,
-has_water boolean NOT NULL DEFAULT false,
-phone text,
-website text,
-opening_hours text
-```
+#### `places`
+Main places table with canonical data.
 
-### Incorrect Pattern (Violates Pattern)
-```sql
--- JSONB for hard facts (FORBIDDEN)
-amenities jsonb,  -- { "has_electricity": true }
-contact jsonb     -- { "phone": "...", "website": "..." }
-```
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique place identifier |
+| `place_type` | text | NOT NULL | Place type enum |
+| `name` | text | NOT NULL | Place name |
+| `geom` | geometry | NOT NULL | PostGIS geometry |
+| `lat` | numeric | NULL | Latitude |
+| `lon` | numeric | NULL | Longitude |
+| `country_code` | text | NULL | ISO country code |
+| `region` | text | NULL | Region/state |
+| `city` | text | NULL | City name |
+| `postcode` | text | NULL | Postal code |
+| `address` | text | NULL | Full address |
+| `has_toilet` | boolean | NOT NULL | Has toilet facility |
+| `has_shower` | boolean | NOT NULL | Has shower facility |
+| `has_electricity` | boolean | NOT NULL | Has electricity |
+| `has_water` | boolean | NOT NULL | Has water |
+| `has_wifi` | boolean | NOT NULL | Has WiFi |
+| `pet_friendly` | boolean | NOT NULL | Pet friendly |
+| `caravan_allowed` | boolean | NOT NULL | Caravan allowed |
+| `motorhome_allowed` | boolean | NOT NULL | Motorhome allowed |
+| `tent_allowed` | boolean | NOT NULL | Tent allowed |
+| `website` | text | NULL | Website URL |
+| `phone` | text | NULL | Phone number |
+| `email` | text | NULL | Email address |
+| `opening_hours` | text | NULL | Opening hours |
+| `fee_info` | text | NULL | Fee information |
+| `source_primary` | text | NOT NULL | Primary data source |
+| `data_confidence` | numeric | NULL | Confidence score |
+| `last_seen_at` | timestamptz | NULL | Last observed |
+| `last_enriched_at` | timestamptz | NULL | Last enriched |
+| `is_active` | boolean | NOT NULL | Active flag |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Last update |
 
-### Exception
-Raw source tags (OSM `tags` JSONB in `osm_source`) are acceptable because they represent unprocessed source data, not canonical facts.
+#### `osm_source`
+OSM source data tracking.
 
-### Derived Booleans vs Authoritative Facts
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `osm_type` | text | NOT NULL | OSM object type |
+| `osm_id` | bigint | NOT NULL | OSM object ID |
+| `osm_version` | integer | NULL | OSM version |
+| `tags` | jsonb | NOT NULL | OSM tags |
+| `raw_name` | text | NULL | Raw OSM name |
+| `source_snapshot_date` | timestamptz | NULL | Snapshot date |
+| `imported_at` | timestamptz | NOT NULL | Import timestamp |
+| `first_seen_at` | timestamptz | NOT NULL | First seen |
+| `last_seen_at` | timestamptz | NOT NULL | Last seen |
+| `last_import_run_id` | bigint | NULL | Import run reference |
+| `geometry_kind` | text | NULL | Geometry type |
+| `geometry_hash` | text | NULL | Geometry hash |
+| `centroid` | geometry | NULL | Centroid point |
+| `geom` | geometry | NULL | Full geometry |
+| `osm_timestamp` | timestamptz | NULL | OSM timestamp |
+| `osmium_unique_id` | text | NULL | Osmium unique ID |
+| `first_seen_snapshot_id` | text | NULL | First snapshot ID |
+| `last_seen_snapshot_id` | text | NULL | Last snapshot ID |
+| `is_current` | boolean | NOT NULL | Current flag |
+| `source_metadata` | jsonb | NOT NULL | Source metadata |
 
-The `places.has_*` boolean columns (has_electricity, has_water, etc.) are **derived** values computed from various sources. The authoritative storage for amenity facts is in `place_llm_facts` with `provenance_kind` tracking how each fact was derived:
-- `llm_extracted` - Fact extracted by LLM
-- `source_verified` - Fact verified against source
-- `user_confirmed` - Fact confirmed by user
+#### `campsites_cache`
+Cached campsite data.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `place_id` | uuid | NULL | Place reference |
+| `name` | text | NOT NULL | Campsite name |
+| `lat` | numeric | NOT NULL | Latitude |
+| `lng` | numeric | NOT NULL | Longitude |
+| `rating` | numeric | NULL | Overall rating |
+| `photo_url` | text | NULL | Photo URL |
+| `estimated_price` | numeric | NULL | Estimated price |
+| `place_types` | text[] | NULL | Array of types |
+| `last_updated` | timestamptz | NULL | Last update |
+| `created_at` | timestamptz | NULL | Creation time |
+| `price_source` | text | NULL | Price source |
+| `user_price_count` | integer | NULL | Number of user prices |
+| `user_price_avg` | numeric | NULL | Average user price |
+| `description` | text | NULL | Description |
+| `description_source` | text | NULL | Description source |
+| `description_generated_at` | timestamptz | NULL | Generation time |
+| `description_version` | integer | NULL | Version number |
+| `opening_hours` | text | NULL | Opening hours |
+| `contact_phone` | text | NULL | Phone number |
+| `contact_email` | text | NULL | Email address |
+| `scraped_website_url` | text | NULL | Scraped URL |
+| `scraped_at` | timestamptz | NULL | Scraping time |
+| `scraped_price_info` | jsonb | NULL | Price info JSON |
+| `scraped_data_source` | text | NULL | Data source |
+| `google_data_fetched_at` | timestamptz | NULL | Google fetch time |
+| `google_data_expires_at` | timestamptz | NULL | Google expiry |
+| `google_photos` | jsonb | NULL | Google photos JSON |
+| `google_reviews` | jsonb | NULL | Google reviews JSON |
+
+#### `campsite_prices`
+User-submitted price data.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `place_id` | uuid | NOT NULL | Place reference |
+| `user_id` | uuid | NULL | User reference |
+| `price_per_night` | numeric | NOT NULL | Price per night |
+| `price_type` | text | NULL | Price type |
+| `currency` | text | NULL | Currency code |
+| `rating` | numeric | NULL | User rating |
+| `review_text` | text | NULL | Review text |
+| `created_at` | timestamptz | NULL | Creation time |
+
+#### `campsite_reviews`
+User reviews and ratings.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `user_id` | uuid | NOT NULL | User reference |
+| `place_id` | text | NOT NULL | Place reference |
+| `place_name` | text | NOT NULL | Place name |
+| `rating` | integer | NOT NULL | Star rating (1-5) |
+| `comment` | text | NULL | Review comment |
+| `created_at` | timestamptz | NULL | Creation time |
+
+#### `place_enrichment`
+Place enrichment data and LLM processing.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | NOT NULL | Place reference |
+| `status` | text | NOT NULL | Enrichment status |
+| `provider` | text | NULL | LLM provider |
+| `model` | text | NULL | Model identifier |
+| `prompt_version` | text | NULL | Prompt version |
+| `source_urls` | jsonb | NOT NULL | Source URLs |
+| `extracted` | jsonb | NOT NULL | Extracted data |
+| `summary_de` | text | NULL | German summary |
+| `confidence` | numeric | NULL | Confidence score |
+| `hallucination_risk` | numeric | NULL | Hallucination risk |
+| `token_input` | integer | NULL | Input tokens |
+| `token_output` | integer | NULL | Output tokens |
+| `cost_usd` | numeric | NULL | Cost in USD |
+| `validation_errors` | jsonb | NOT NULL | Validation errors |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `completed_at` | timestamptz | NULL | Completion time |
+| `source_evidence` | jsonb | NULL | Evidence JSON |
+| `evidence_markers` | jsonb | NULL | Evidence markers |
+| `collection_status` | text | NULL | Collection status |
+| `failure_classification` | text | NULL | Failure category |
+| `provider_attempts` | jsonb | NULL | Attempt history |
+| `job_cost_usd` | numeric | NULL | Job cost |
+| `enrichment_schema_version` | text | NULL | Schema version |
+
+### LLM Enrichment Tables
+
+#### `place_llm_enrichments`
+LLM output storage (parent table).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `job_id` | bigint | FK → enrichment_jobs.id, NULL | Job reference |
+| `provider` | text | NOT NULL | LLM provider |
+| `model` | text | NOT NULL | Model identifier |
+| `prompt_version` | text | NULL | Prompt version |
+| `summary_de` | text | NULL | German summary |
+| `confidence` | numeric | NULL | Confidence (0-1) |
+| `hallucination_risk` | numeric | NULL | Hallucination risk (0-1) |
+| `token_input` | integer | NULL | Input tokens |
+| `token_output` | integer | NULL | Output tokens |
+| `cost_usd` | numeric | NULL | Cost in USD |
+| `status` | text | NOT NULL | Processing status |
+| `started_at` | timestamptz | NULL | Start time |
+| `completed_at` | timestamptz | NULL | Completion time |
+| `is_current` | boolean | NOT NULL | Current flag |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+| `created_by` | text | NULL | Creator reference |
+
+#### `place_llm_facts`
+Individual LLM-extracted facts.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `llm_enrichment_id` | bigint | FK → place_llm_enrichments.id, NOT NULL | Parent enrichment |
+| `field_name` | text | NOT NULL | Field name |
+| `value_text` | text | NULL | Value as text |
+| `value_type` | text | NOT NULL | Value type |
+| `confidence` | numeric | NULL | Confidence score |
+| `provenance_kind` | text | NULL | Provenance type |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+#### `place_llm_sources`
+Sources cited by LLM.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `llm_enrichment_id` | bigint | FK → place_llm_enrichments.id, NOT NULL | Parent enrichment |
+| `source_url` | text | NOT NULL | Source URL |
+| `source_domain` | text | NULL | Domain |
+| `source_kind` | text | NOT NULL | Source type |
+| `trusted` | boolean | NULL | Trusted flag |
+| `relevance_score` | numeric | NULL | Relevance (0-1) |
+| `fetched_at` | timestamptz | NULL | Fetch time |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+
+#### `place_llm_evidence_markers`
+Trust markers for LLM output.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `llm_enrichment_id` | bigint | FK → place_llm_enrichments.id, NOT NULL | Parent enrichment |
+| `field_name` | text | NOT NULL | Field name |
+| `marker_text` | text | NOT NULL | Marker text |
+| `marker_type` | text | NOT NULL | Marker type |
+| `confidence` | numeric | NULL | Confidence |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+
+### Evidence Collection Tables
+
+#### `place_source_evidence_runs`
+Evidence collection audit.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `job_id` | bigint | FK → enrichment_jobs.id, NULL | Job reference |
+| `worker_id` | text | NULL | Worker ID |
+| `attempt_number` | integer | NOT NULL | Attempt count |
+| `collection_status` | text | NOT NULL | Collection status |
+| `source_urls` | jsonb | NULL | Source URLs array |
+| `source_evidence` | jsonb | NULL | Scraped content |
+| `evidence_markers` | jsonb | NULL | Evidence markers |
+| `trusted_source_count` | integer | NULL | Trusted source count |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+#### `place_evidence_sources`
+Individual fetched sources.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `evidence_run_id` | bigint | FK → place_source_evidence_runs.id, NOT NULL | Parent run |
+| `source_url` | text | NOT NULL | URL fetched |
+| `source_domain` | text | NULL | Domain |
+| `fetch_status` | text | NOT NULL | Fetch status |
+| `http_status` | integer | NULL | HTTP response code |
+| `trusted` | boolean | NULL | Trusted flag |
+| `content_type` | text | NULL | Content type |
+| `fetched_at` | timestamptz | NULL | Fetch time |
+| `content_length` | integer | NULL | Content length |
+| `error_message` | text | NULL | Error message |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+#### `place_evidence_markers`
+Evidence markers from sources.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `evidence_run_id` | bigint | FK → place_source_evidence_runs.id, NOT NULL | Parent run |
+| `field_name` | text | NOT NULL | Field name |
+| `marker_text` | text | NOT NULL | Marker text |
+| `marker_type` | text | NOT NULL | Marker type |
+| `confidence` | numeric | NULL | Confidence |
+| `source_url` | text | NULL | Source URL |
+| `context_before` | text | NULL | Context before |
+| `context_after` | text | NULL | Context after |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+
+### Google Sources Tables
+
+#### `place_google_sources`
+Google Places API cache (parent table).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `google_place_id` | text | NOT NULL | Google Place ID |
+| `name` | text | NULL | Place name |
+| `formatted_address` | text | NULL | Full address |
+| `phone` | text | NULL | Phone number |
+| `website` | text | NULL | Website URL |
+| `rating` | numeric | NULL | Google rating |
+| `review_count` | integer | NULL | Number of reviews |
+| `business_status` | text | NULL | Business status |
+| `lat` | numeric | NULL | Latitude |
+| `lon` | numeric | NULL | Longitude |
+| `raw_payload` | jsonb | NULL | Full API response |
+| `fetched_at` | timestamptz | NOT NULL | Fetch time |
+| `expires_at` | timestamptz | NULL | Expiration time |
+| `is_current` | boolean | NOT NULL | Current flag |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+#### `place_google_reviews`
+Individual Google reviews.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
+| `author_name` | text | NULL | Reviewer name |
+| `rating` | integer | NULL | Star rating |
+| `language_code` | text | NULL | Language code |
+| `review_text` | text | NULL | Review content |
+| `review_time` | timestamptz | NULL | Review timestamp |
+| `relative_time_description` | text | NULL | Relative time |
+| `google_review_id` | text | NULL | Google review ID |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+
+#### `place_google_photos`
+Google place photos.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
+| `photo_reference` | text | NOT NULL | Google photo token |
+| `width` | integer | NULL | Photo width |
+| `height` | integer | NULL | Photo height |
+| `attribution` | text | NULL | Attribution text |
+| `google_photo_id` | text | NULL | Google photo ID |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+
+#### `place_google_types`
+Google place types.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
+| `google_type` | text | NOT NULL | Google type |
+| `is_primary` | boolean | NOT NULL | Primary flag |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+
+#### `place_google_amenities`
+Google amenities data.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
+| `amenity_key` | text | NOT NULL | Amenity key |
+| `value_text` | text | NULL | Text value |
+| `value_boolean` | boolean | NULL | Boolean value |
+| `value_numeric` | numeric | NULL | Numeric value |
+| `value_type` | text | NOT NULL | Value type enum |
+| `google_feature_type` | text | NULL | Feature type |
+| `is_verified` | boolean | NOT NULL | Verified flag |
+| `confidence_score` | numeric | NULL | Confidence |
+| `source_section` | text | NULL | Source section |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+### Queue & Import Tables
+
+#### `enrichment_jobs`
+Data enrichment job queue.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | NOT NULL | Place reference |
+| `job_type` | text | NOT NULL | Job type enum |
+| `priority` | integer | NOT NULL | Priority level |
+| `status` | text | NOT NULL | Job status |
+| `attempts` | integer | NOT NULL | Attempt count |
+| `max_attempts` | integer | NOT NULL | Max attempts |
+| `run_after` | timestamptz | NOT NULL | Run after time |
+| `locked_by` | text | NULL | Worker lock |
+| `locked_at` | timestamptz | NULL | Lock time |
+| `error_message` | text | NULL | Error message |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+| `freshness_bucket` | text | NOT NULL | Freshness bucket |
+| `lease_expires_at` | timestamptz | NULL | Lease expiry |
+| `heartbeat_at` | timestamptz | NULL | Last heartbeat |
+| `payload` | jsonb | NOT NULL | Job payload |
+| `context` | jsonb | NOT NULL | Job context |
+| `last_error_at` | timestamptz | NULL | Last error time |
+| `dead_lettered_at` | timestamptz | NULL | Dead letter time |
+| `classification` | text | NULL | Error classification |
+| `source_state` | text | NULL | Source state |
+| `worker_id` | text | NULL | Worker ID |
+| `attempt_number` | integer | NULL | Attempt number |
+| `last_error_code` | text | NULL | Error code |
+| `last_error_message` | text | NULL | Error message |
+| `canonical_place_id` | uuid | NULL | Place UUID |
+| `metadata` | jsonb | NULL | Metadata JSON |
+
+#### `description_generation_jobs`
+LLM description generation queue.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `place_id` | uuid | NOT NULL | Place reference |
+| `status` | text | NULL | Job status |
+| `priority` | integer | NULL | Priority level |
+| `attempts` | integer | NULL | Attempt count |
+| `error_message` | text | NULL | Error message |
+| `created_at` | timestamptz | NULL | Creation time |
+| `updated_at` | timestamptz | NULL | Update time |
+| `completed_at` | timestamptz | NULL | Completion time |
+
+#### `website_scraping_jobs`
+Website scraping job queue.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `place_id` | uuid | NOT NULL | Place reference |
+| `website_url` | text | NOT NULL | URL to scrape |
+| `status` | text | NULL | Job status |
+| `priority` | integer | NULL | Priority level |
+| `attempts` | integer | NULL | Attempt count |
+| `extracted_data` | jsonb | NULL | Extracted data |
+| `error_message` | text | NULL | Error message |
+| `created_at` | timestamptz | NULL | Creation time |
+| `updated_at` | timestamptz | NULL | Update time |
+| `completed_at` | timestamptz | NULL | Completion time |
+
+#### `countries`
+Country definitions for imports.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `iso_code` | text | PK, NOT NULL | ISO country code |
+| `name` | text | NOT NULL | Country name |
+| `geofabrik_name` | text | NOT NULL | Geofabrik name |
+| `geofabrik_url` | text | NOT NULL | Geofabrik URL |
+| `bounding_box` | jsonb | NOT NULL | Bounding box JSON |
+| `created_at` | timestamptz | NULL | Creation time |
+
+#### `country_import_status`
+Import status tracking per country.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `country_code` | text | NOT NULL | Country code |
+| `status` | text | NOT NULL | Import status |
+| `source_type` | text | NOT NULL | Source type |
+| `started_at` | timestamptz | NULL | Start time |
+| `completed_at` | timestamptz | NULL | Completion time |
+| `poi_count` | integer | NULL | Number of POIs |
+| `error_message` | text | NULL | Error message |
+| `created_at` | timestamptz | NULL | Creation time |
+| `updated_at` | timestamptz | NULL | Update time |
+
+#### `osm_import_jobs`
+OSM import job tracking.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `job_type` | text | NOT NULL | Job type |
+| `status` | text | NOT NULL | Job status |
+| `started_at` | timestamptz | NULL | Start time |
+| `completed_at` | timestamptz | NULL | Completion time |
+| `result` | jsonb | NULL | Result JSON |
+| `error_message` | text | NULL | Error message |
+| `created_by` | text | NULL | Creator |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+#### `osm_import_runs`
+OSM import run history.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `source` | text | NOT NULL | Data source |
+| `status` | text | NOT NULL | Run status |
+| `bbox` | jsonb | NULL | Bounding box |
+| `tile_count` | integer | NOT NULL | Total tiles |
+| `fetched_count` | integer | NOT NULL | Fetched count |
+| `normalized_count` | integer | NOT NULL | Normalized count |
+| `imported_count` | integer | NOT NULL | Imported count |
+| `created_count` | integer | NOT NULL | Created count |
+| `updated_count` | integer | NOT NULL | Updated count |
+| `noop_count` | integer | NOT NULL | No-op count |
+| `failed_count` | integer | NOT NULL | Failed count |
+| `stale_marked_inactive_count` | integer | NOT NULL | Stale count |
+| `error_messages` | jsonb | NOT NULL | Error messages |
+| `started_at` | timestamptz | NOT NULL | Start time |
+| `finished_at` | timestamptz | NULL | Finish time |
+| `run_kind` | text | NOT NULL | Run kind |
+| `ingestion_provider` | text | NOT NULL | Provider |
+| `tile_key` | text | NULL | Tile key |
+| `parent_run_id` | bigint | NULL | Parent run |
+| `queue_job_id` | bigint | NULL | Queue job |
+| `current_tile` | integer | NULL | Current tile |
+| `total_tiles` | integer | NULL | Total tiles |
+
+#### `osm_refresh_jobs`
+OSM data refresh jobs.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigint | PK, NOT NULL | Unique identifier |
+| `tile_key` | text | NOT NULL | Tile key |
+| `bbox` | jsonb | NOT NULL | Bounding box |
+| `source_provider` | text | NOT NULL | Source provider |
+| `status` | text | NOT NULL | Job status |
+| `attempts` | integer | NOT NULL | Attempt count |
+| `max_attempts` | integer | NOT NULL | Max attempts |
+| `priority` | integer | NOT NULL | Priority |
+| `run_after` | timestamptz | NOT NULL | Run after time |
+| `locked_by` | text | NULL | Worker lock |
+| `lease_expires_at` | timestamptz | NULL | Lease expiry |
+| `last_run_id` | bigint | NULL | Last run ID |
+| `error_message` | text | NULL | Error message |
+| `created_at` | timestamptz | NOT NULL | Creation time |
+| `updated_at` | timestamptz | NOT NULL | Update time |
+
+### Audit & Settings Tables
+
+#### `app_settings`
+Application configuration.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, NOT NULL | Unique identifier |
+| `key` | text | NOT NULL | Setting key |
+| `category` | text | NOT NULL | Category |
+| `type` | text | NOT NULL | Value type |
+| `value` | jsonb | NOT NULL | Setting value |
+| `encrypted` | boolean | NULL | Encrypted flag |
+| `description` | text | NULL | Description |
+| `validation_rules` | jsonb | NULL | Validation rules |
+| `is_archived` | boolean | NULL | Archived flag |
+| `created_by` | text | NULL | Creator |
+| `updated_by` | text | NULL | Updater |
+| `created_at` | timestamptz | NULL | Creation time |
+| `updated_at` | timestamptz | NULL | Update time |
+| `version` | integer | NULL | Version |
 
 ---
 
 ## Views
 
-- `campsite_full` - Canonical API read model (all sources combined, includes `has_*` amenity booleans)
-- `campsite_review_summary` - Aggregated review statistics
-- `campsite_price_summary` - Aggregated price statistics
-- `campsite_api_read_model` - Legacy read model alias (should not be used by runtime)
+### `campsite_full`
+Canonical API read model combining all sources.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `place_id` | text | Place UUID |
+| `name` | text | Place name |
+| `location` | text | Location description |
+| `lat` | numeric | Latitude |
+| `lng` | numeric | Longitude |
+| `has_toilet` | boolean | Has toilet |
+| `has_shower` | boolean | Has shower |
+| `has_electricity` | boolean | Has electricity |
+| `has_water` | boolean | Has water |
+| `has_wifi` | boolean | Has WiFi |
+| `has_dogs_allowed` | boolean | Dogs allowed |
+| `has_beach` | boolean | Has beach |
+| `has_laundry` | boolean | Has laundry |
+| `has_restaurant` | boolean | Has restaurant |
+| `has_bar` | boolean | Has bar |
+| `has_shop` | boolean | Has shop |
+| `has_pool` | boolean | Has pool |
+| `has_playground` | boolean | Has playground |
+| `has_dump_station` | boolean | Has dump station |
+| `has_washing_machine` | boolean | Has washing machine |
+| `has_dishwasher` | boolean | Has dishwasher |
+| `review_count` | bigint | Number of reviews |
+| `avg_rating` | numeric | Average rating |
+| `favorite_count` | bigint | Number of favorites |
+| ... | ... | (plus all other campsite fields) |
+
+### `campsite_review_summary`
+Aggregated review statistics.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `place_id` | text | Place UUID |
+| `place_name` | text | Place name |
+| `review_count` | bigint | Number of reviews |
+| `avg_rating` | numeric | Average rating |
+| `min_rating` | numeric | Minimum rating |
+| `max_rating` | numeric | Maximum rating |
+
+### `campsite_price_summary`
+Aggregated price statistics.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `place_id` | text | Place UUID |
+| `osm_place_id` | text | OSM place ID |
+| `price_count` | bigint | Number of prices |
+| `avg_price` | numeric | Average price |
+| `min_price` | numeric | Minimum price |
+| `max_price` | numeric | Maximum price |
+| `avg_rating` | numeric | Average rating |
+| `review_count` | bigint | Review count |
+
+### `campsite_api_read_model`
+Legacy read model alias (deprecated).
 
 ---
 
-## Key Enums
+## Enums
 
-- `user_role` - 'user' | 'admin'
-- `stop_type` - 'camping' | 'stellplatz' | 'poi' | 'city' | 'address'
-- `job_status` - 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
-- `enrichment_job_type_enum` - 'enrich_llm' | 'llm_description' | 'refresh_osm' | 'google_places'
-- `place_type_enum` - 'camp_site' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction'
-
----
-
-## Phase 1 Scope: What Was Implemented
-
-### Completed in Phase 1 (2026-03-16)
-
-1. **Runtime-to-Schema Migration** - 7 runtime fields moved to formal schema in `place_enrichment`
-2. **Normalized Source Tables** - 3 new parent tables for source family isolation
-3. **Evidence Collection Table** - Separate audit trail from enrichment results
-4. **Queue Metadata Hardening** - 7 typed columns in `enrichment_jobs` + metadata bridge
-5. **Type Safety** - database.types.ts regeneration required
-
----
-
-## Phase 1 LLM Enrichment Contract Matrix
-
-> **Authoritative Source:** Live schema (`supabase/migrations/*.sql`) and generated types (`database.types.ts`)
-> **Last Verified:** 2026-03-17
-
-This matrix defines the authoritative contract for Phase 1 LLM enrichment. Tables and columns not listed here are NOT in scope for Phase 1.
-
-### IN-SCOPE-NOW (Required for Phase 1 LLM Path)
-
-| Table | Status | Purpose | Key Columns |
-|-------|--------|---------|-------------|
-| `place_llm_enrichments` | **ACTIVE** | LLM output storage (parent) | place_id, job_id, provider, model, prompt_version, summary_de, confidence, hallucination_risk, token_input, token_output, cost_usd, status, is_current |
-| `place_enrichment` | **ACTIVE** | Parent enrichment record (7 new columns) | source_evidence, evidence_markers, collection_status, failure_classification, provider_attempts, job_cost_usd, enrichment_schema_version |
-| `enrichment_jobs` | **ACTIVE** | Job queue (7 new columns) | classification, source_state, worker_id, attempt_number, last_error_code, last_error_message, canonical_place_id |
-
-### OPTIONAL-NOW (Available but Not Required)
-
-| Table | Status | Purpose | Notes |
-|-------|--------|---------|-------|
-| `place_llm_facts` | OPTIONAL | Individual LLM-extracted facts | Child of place_llm_enrichments; follow Amenity Facts Pattern |
-| `place_llm_sources` | OPTIONAL | Sources cited by LLM | Child of place_llm_enrichments; tracks source provenance |
-| `place_llm_evidence_markers` | OPTIONAL | Trust markers for LLM output | Child of place_llm_enrichments; citations |
-
-### DEFERRED-LATER (Phase 2+)
-
-| Table | Status | Purpose | Blocker |
-|-------|--------|---------|---------|
-| `place_source_evidence_runs` | DEFERRED | Evidence collection audit | Requires evidence collection worker |
-| `place_evidence_sources` | DEFERRED | Individual fetched sources | Requires evidence collection worker |
-| `place_evidence_markers` | DEFERRED | Evidence markers from collection | Requires evidence collection worker |
-| `place_google_sources` | DEFERRED | Google Places API cache | Phase 2 Google path |
-| `place_google_reviews` | DEFERRED | Individual Google reviews | Phase 2 Google path |
-| `place_google_photos` | DEFERRED | Google place photos | Phase 2 Google path |
-| `place_google_types` | DEFERRED | Google place types | Phase 2 Google path |
-
-### Authoritative Column Reference: place_llm_enrichments
-
-> **CRITICAL:** Do NOT use stale field names from old examples. Always refer to this matrix.
-
-| Column | Type | Required | Notes |
-|--------|------|----------|-------|
-| `id` | bigserial | Yes | Primary key |
-| `place_id` | bigint | Yes | FK to places.id |
-| `job_id` | bigint | No | FK to enrichment_jobs.id |
-| `provider` | text | Yes | LLM provider (openai, anthropic) |
-| `model` | text | Yes | Model identifier |
-| `prompt_version` | text | No | Prompt template version |
-| `summary_de` | text | No | German summary |
-| `confidence` | numeric(3,2) | No | 0-1 range |
-| `hallucination_risk` | numeric(3,2) | No | 0-1 range |
-| `token_input` | integer | No | Prompt tokens (NOT prompt_tokens) |
-| `token_output` | integer | No | Completion tokens (NOT completion_tokens) |
-| `cost_usd` | numeric(10,4) | No | Cost in USD |
-| `status` | text | Yes | pending/processing/completed/failed |
-| `is_current` | boolean | Yes | Whether this is current |
-| `created_at` | timestamptz | Yes | Record creation |
-| `updated_at` | timestamptz | Yes | Last update |
-
-### Stale Field Names (DO NOT USE)
-
-The following field names appear in old documentation but do NOT exist in the live schema:
-
-| Stale Name | Correct Name | Notes |
-|------------|--------------|-------|
-| `structured_facts` | (use child tables) | Does NOT exist; use place_llm_facts |
-| `prompt_tokens` | `token_input` | Wrong field name |
-| `completion_tokens` | `token_output` | Wrong field name |
-| `total_tokens` | (computed) | Not stored; compute as token_input + token_output |
-
----
-
-## Explicitly Deferred Items (Phase 2+)
-
-The following items are NOT in Phase 1 scope:
-
-| Item | Reason for Deferral | Target Phase |
-|------|---------------------|--------------|
-| `osm_source` → `place_osm_sources` rename | Renames are destructive; do after proving new schema works | Phase 2 |
-| `places` table shrink (remove source-owned columns) | Requires merged-read parity proof | Phase 2 |
-| User submission tables (`place_user_submissions`) | Requires UX design and moderation workflow | Phase 2+ |
-| Dynamic resolution tables (`place_field_resolution_rules`) | Optional enhancement | Phase 2+ |
-| Multi-language support (`summary_en`, `summary_fr`) | Requires i18n framework selection | Phase 2+ |
-| Media fields (`photos`, `videos` storage) | Requires storage infrastructure decisions | Phase 2+ |
-| Real-time fields (`live_availability`, `current_occupancy`) | Requires sensor/IoT integration | Phase 2+ |
-| Field family consolidation (cost_usd + job_cost_usd) | Duplicate consolidation requires migration analysis | Phase 2 |
-| Status field consolidation (collection_status vs status enum) | Requires state machine redesign | Phase 2 |
-
-**Note:** Deferral =/= Abandonment. These items are catalogued for future phases.
+| Enum Name | Values |
+|-----------|--------|
+| `user_role` | 'user', 'admin' |
+| `stop_type` | 'camping', 'stellplatz', 'poi', 'city', 'address' |
+| `cost_type` | 'per_night', 'entry_fee', 'none' |
+| `job_status` | 'pending', 'processing', 'completed', 'failed', 'skipped' |
+| `place_type_enum` | 'camp_site', 'camper_stop', 'overnight_parking', 'parking', 'attraction' |
+| `enrichment_status_enum` | 'pending', 'processing', 'done', 'failed', 'needs_review' |
+| `enrichment_job_type_enum` | 'enrich_llm', 'refresh_osm', 'google_places' |
+| `job_status_enum` | 'queued', 'running', 'done', 'failed', 'dead' |
 
 ---
 
 ## RPC Functions
 
-### `get_place_source_bundle(BIGINT)` → JSONB
+### `get_place_source_bundle(bigint)` → jsonb
 
-**Purpose:** Returns a complete source bundle for a place by its BIGINT id.
-
-**Signature Change:** This function was updated from `get_place_source_bundle(UUID)` to `get_place_source_bundle(BIGINT)` to match the `places.id` column type.
+Returns a complete source bundle for a place by its bigint id.
 
 **Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `place_id` | bigint | The place ID from the `places` table |
+- `place_id` (bigint): The place ID from the `places` table
 
-**Returns:** JSONB object with the following structure:
+**Returns:** JSONB object with structure:
 ```json
 {
   "base": { /* places table row */ },
@@ -468,73 +887,117 @@ The following items are NOT in Phase 1 scope:
 ```
 
 **Behavior:**
-- Returns `NULL` if the place_id does not exist in the `places` table
+- Returns `NULL` if place_id does not exist
 - Only includes current (is_current = true) source records
-- User aggregates are computed on-the-fly from `campsite_reviews` and `favorites`
+- User aggregates computed from `campsite_reviews` and `favorites`
 
-**Usage Example:**
+---
+
+## Foreign Key Relationships
+
+### Core Relationships
+
+```
+profiles (id)
+  ├── trips (user_id)
+  ├── trip_reminders (user_id)
+  ├── vehicle_profiles (user_id)
+  ├── favorites (user_id)
+  ├── campsite_reviews (user_id)
+  └── campsite_prices (user_id)
+
+trips (id)
+  ├── trip_stops (trip_id)
+  └── trip_reminders (trip_id)
+
+places (id)
+  ├── osm_source (place_id)
+  ├── place_enrichment (place_id)
+  ├── place_llm_enrichments (place_id)
+  ├── place_source_evidence_runs (place_id)
+  ├── place_google_sources (place_id)
+  └── enrichment_jobs (place_id)
+```
+
+### Enrichment Relationships
+
+```
+enrichment_jobs (id)
+  ├── place_llm_enrichments (job_id)
+  └── place_source_evidence_runs (job_id)
+
+place_llm_enrichments (id)
+  ├── place_llm_facts (llm_enrichment_id)
+  ├── place_llm_sources (llm_enrichment_id)
+  └── place_llm_evidence_markers (llm_enrichment_id)
+
+place_source_evidence_runs (id)
+  ├── place_evidence_sources (evidence_run_id)
+  └── place_evidence_markers (evidence_run_id)
+
+place_google_sources (id)
+  ├── place_google_reviews (google_source_id)
+  ├── place_google_photos (google_source_id)
+  ├── place_google_types (google_source_id)
+  └── place_google_amenities (google_source_id)
+```
+
+---
+
+## Schema Design Patterns
+
+### Amenity Facts Pattern
+Hard factual data (amenities, contact info) MUST be stored in typed columns, NOT JSONB.
+
+**Correct:**
 ```sql
-SELECT get_place_source_bundle(12345);
+has_electricity boolean NOT NULL DEFAULT false,
+phone text,
+website text
 ```
 
-**Migration Notes:**
-- **BREAKING:** Parameter type changed from UUID to BIGINT
-- Consumers must update API endpoints from `place_uuid` to `place_id`
-- Old function signature `get_place_source_bundle(UUID)` has been dropped
-
----
-
-## Regenerating Types
-
-### Using the generate-types script
-
-```bash
-# Navigate to project root
-cd camperplaner-product
-
-# Run the type generation script
-node scripts/generate-types.js
+**Incorrect (Forbidden):**
+```sql
+amenities jsonb,  -- { "has_electricity": true }
+contact jsonb     -- { "phone": "...", "website": "..." }
 ```
 
-This script connects to Supabase and regenerates `apps/web/src/lib/database.types.ts` with the latest schema.
+### JSONB Justification
+JSONB columns are allowed ONLY for specific use cases:
 
-### Alternative: Using Supabase CLI
+| Use Case | Example |
+|----------|---------|
+| Evidence storage | `source_evidence`, `evidence_markers` |
+| Vendor-specific details | `place_google_sources.raw_payload` |
+| Debug metadata | `provider_attempts`, `metadata` |
+| Unprocessed source data | `osm_source.tags` |
 
-```bash
-# Install supabase CLI if needed
-npm install -g supabase
+### Source Family Pattern
+New enrichment schema uses "source families" - parent tables that group related data:
 
-# Generate types directly
-npx supabase gen types typescript --local > apps/web/src/lib/database.types.ts
-```
+1. **LLM Family** (`place_llm_enrichments`)
+   - Parent: place_llm_enrichments
+   - Children: place_llm_facts, place_llm_sources, place_llm_evidence_markers
 
-See `scripts/generate-types.js` for the full generation script.
+2. **Evidence Family** (`place_source_evidence_runs`)
+   - Parent: place_source_evidence_runs
+   - Children: place_evidence_sources, place_evidence_markers
 
----
-
-## Cross-Repository Documentation
-
-- **Worker Schema Migration Guide:** `docs/worker-schema-migration-guide.md`
-- **Phase 1 Compatibility Decisions:** `docs/phase-1-compatibility-decisions.md`
-- **Amenity Boolean Migration:** `docs/worker-handoff-amenities-boolean-migration.md`
-
-### Deployment Sequence
-
-Per AGENTS.md, the deployment order is:
-
-1. **Product Schema Migration** - Run migrations in `supabase/migrations/`
-2. **Wait for PostgREST Cache Refresh** - 30-60 seconds
-3. **Types & Documentation Update** - Regenerate database.types.ts
-4. **Worker Update** - Deploy to worker repo after schema cache refresh
+3. **Google Family** (`place_google_sources`)
+   - Parent: place_google_sources
+   - Children: place_google_reviews, place_google_photos, place_google_types, place_google_amenities
 
 ---
 
-## PostGIS System Tables (exposed via API)
+## Last Updated
 
-- `spatial_ref_sys` - Spatial reference systems
-- `geography_columns` - Geography columns metadata
-- `geometry_columns` - Geometry columns metadata
+2026-03-18
 
 ---
 
-*Last Updated: 2026-03-18*
+## Related Documentation
+
+- `docs/er-diagram.md` - Entity Relationship Diagram (Mermaid)
+- `docs/database-access-audit.md` - Full access audit
+- `docs/worker-schema-migration-guide.md` - Worker migration guide
+- `docs/SCHEMA_WORKFLOW.md` - Schema workflow documentation
