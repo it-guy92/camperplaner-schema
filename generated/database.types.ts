@@ -5,7 +5,7 @@
  * DO NOT EDIT MANUALLY.
  * 
  * Source: https://github.com/it-guy92/camperplaner-schema
- * Generated: 2026-03-18
+ * Generated: 2026-03-18 (test-trigger)
  * Migration Head: 20260318_fix_get_place_source_bundle_signature.sql
  * 
  * To regenerate: node scripts/generate-types.js
