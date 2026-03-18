@@ -41,9 +41,6 @@ jobs:
               # Allow rollback files: rollback_<name>.sql
               if [[ "$filename" =~ ^(rollback_[a-zA-Z0-9_]+)\.sql$ ]]; then
                 echo "  ℹ️  Special file (allowed): $filename"
-              # Allow pre-existing 8-digit timestamp files from 2026-03-18 batch
-              elif [[ "$filename" =~ ^20260318_[a-zA-Z0-9_]+\.sql$ ]]; then
-                echo "  ℹ️  Legacy timestamp (allowed): $filename"
               else
                 INVALID_NAMING+=("$filename")
                 echo "  ❌ Invalid naming: $filename"
