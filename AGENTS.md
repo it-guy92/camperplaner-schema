@@ -27,7 +27,7 @@ This repository is exclusively responsible for:
    - Any schema-related documentation
 
 3. **Generated TypeScript Types**
-   - `packages/database-types/` - Generated `database.types.ts`
+   - `generated/` - Generated `database.types.ts`
    - Type generation from schema (via Supabase CLI)
 
 4. **Schema Change Workflow**
@@ -108,7 +108,7 @@ Both consumers updated
 
 **Sync command after schema merge:**
 ```bash
-cp -r ../camperplaner-schema/packages/database-types/* apps/web/src/lib/
+cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
 ```
 
 ### camperplaner-worker
@@ -122,7 +122,7 @@ cp -r ../camperplaner-schema/packages/database-types/* apps/web/src/lib/
 
 **Sync command after schema merge:**
 ```bash
-cp ../camperplaner-schema/packages/database-types/database.types.ts src/types/
+cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
 ```
 
 ---
@@ -135,7 +135,7 @@ After migrations are applied, regenerate types:
 
 ```bash
 # Using Supabase CLI
-supabase gen types typescript --local > packages/database-types/database.types.ts
+supabase gen types typescript --local > generated/database.types.ts
 ```
 
 ### Documentation
@@ -159,6 +159,77 @@ After any schema change, update:
 - No application builds
 - No deployment of applications
 - No worker processes
+
+---
+
+## Schema Change Workflow (Schema Owner)
+
+This section defines the operational playbook for schema PRs reviewed and merged by schema owners.
+
+### Mandatory PR Checklist
+
+Before any schema PR can be merged, the following items MUST be present:
+
+1. **Migration SQL present**
+   - File located in `supabase/migrations/`
+   - Follows naming convention: `YYYYMMDD_description.sql`
+   - Includes both forward migration and rollback path documented
+
+2. **Generated types updated**
+   - `generated/database.types.ts` regenerated via `supabase gen types typescript --local`
+   - Types reflect all new columns, tables, and function signatures
+
+3. **Schema docs updated**
+   - `docs/database-schema.md` reflects new schema elements
+   - Breaking changes clearly marked with `**BREAKING:**` prefix
+
+4. **Backward-compat or breaking-change note**
+   - PR description includes impact assessment
+   - If breaking: describes migration path for consumers
+
+5. **Rollback note**
+   - Documents how to revert this change if needed
+   - Includes any data migration considerations
+
+### Merge Gate Requirements
+
+A schema PR MUST meet all of the following before merge:
+
+1. **CI pipeline passes** - All validation workflows green
+2. **Reviewer approval** - At least one schema owner approves
+3. **No unresolved comments** - All PR discussions resolved
+4. **Types generate successfully** - `supabase gen types` completes without errors
+
+### Post-Merge Consumer Sync Contract
+
+After schema PR merges to main, consumers MUST sync artifacts:
+
+**Product Repo sync command:**
+```bash
+cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
+```
+
+**Worker Repo sync command:**
+```bash
+cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
+```
+
+**Timing expectation:** Consumers should sync within 1 business day of schema merge.
+
+### Hotfix Escalation Path
+
+For urgent schema changes (critical bug, security patch):
+
+1. **Create hotfix branch** from main with prefix `hotfix/`
+2. **PR with expedited review** - ping schema owners directly
+3. **Fast-track approval** - may proceed with single owner approval
+4. **Immediate merge** - no waiting for CI if migration is trivial
+5. **Post-merge notification** - alert consumers immediately via issue mention
+
+Hotfixes still require:
+- Migration SQL present
+- Generated types updated
+- Rollback note in PR description
 
 ---
 
