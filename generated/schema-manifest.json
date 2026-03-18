@@ -17,7 +17,7 @@
     }
   ],
   "migrations": {
-    "latest": "20260318235959_noop__ci_trigger.sql",
+    "latest": "20260318235959",
     "count": 29,
     "pending_transfer": []
   },
