@@ -17,8 +17,8 @@
     }
   ],
   "migrations": {
-    "latest": "20260318200000_add_property_tables.sql",
-    "count": 28,
+    "latest": "20260318235959_noop__ci_trigger.sql",
+    "count": 29,
     "pending_transfer": []
   },
   "contract_version": "1.0.0"
