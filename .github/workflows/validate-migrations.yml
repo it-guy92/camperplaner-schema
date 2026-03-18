@@ -38,12 +38,15 @@ jobs:
             # Check if filename follows YYYYMMDDhhmmss_description.sql pattern
             # Timestamp should be exactly 14 digits
             if [[ ! "$filename" =~ ^[0-9]{14}_[a-zA-Z0-9_]+\.sql$ ]]; then
-              # Allow special named files like rollback_restructure.sql
-              if [[ ! "$filename" =~ ^(rollback_[a-zA-Z0-9_]+)\.sql$ ]]; then
+              # Allow rollback files: rollback_<name>.sql
+              if [[ "$filename" =~ ^(rollback_[a-zA-Z0-9_]+)\.sql$ ]]; then
+                echo "  ℹ️  Special file (allowed): $filename"
+              # Allow pre-existing 8-digit timestamp files from 2026-03-18 batch
+              elif [[ "$filename" =~ ^20260318_[a-zA-Z0-9_]+\.sql$ ]]; then
+                echo "  ℹ️  Legacy timestamp (allowed): $filename"
+              else
                 INVALID_NAMING+=("$filename")
                 echo "  ❌ Invalid naming: $filename"
-              else
-                echo "  ℹ️  Special file (allowed): $filename"
               fi
             else
               echo "  ✓ Valid: $filename"
