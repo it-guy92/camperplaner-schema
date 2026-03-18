@@ -1,16 +1,3 @@
-/**
- * CANONICAL DATABASE TYPES
- * 
- * This file is GENERATED from the schema repository.
- * DO NOT EDIT MANUALLY.
- * 
- * Source: https://github.com/it-guy92/camperplaner-schema
- * Generated: 2026-03-18 (test-trigger-3)
- * Migration Head: 20260318_fix_get_place_source_bundle_signature.sql
- * 
- * To regenerate: node scripts/generate-types.js
- */
-
 export type Json =
   | string
   | number
@@ -2111,6 +2098,860 @@ export interface Database {
           metadata?: Json
         }
       }
+      place_osm_properties: {
+        Row: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at: string | null
+          name: string | null
+          description: string | null
+          place_type: string | null
+          source_place_type: string | null
+          source_categories: unknown[] | null
+          country_code: string | null
+          region: string | null
+          city: string | null
+          postcode: string | null
+          address: string | null
+          source_lat: number | null
+          source_lon: number | null
+          website: string | null
+          phone: string | null
+          email: string | null
+          opening_hours: string | null
+          fee_info: string | null
+          wheelchair_accessible: boolean | null
+          family_friendly: boolean | null
+          pets_allowed: boolean | null
+          indoor: boolean | null
+          outdoor: boolean | null
+          entry_fee_required: boolean | null
+          reservation_required: boolean | null
+          overnight_stay_allowed: boolean | null
+          has_parking: boolean | null
+          has_restrooms: boolean | null
+          has_drinking_water: boolean | null
+          has_wifi: boolean | null
+          has_shop: boolean | null
+          has_restaurant: boolean | null
+          has_cafe: boolean | null
+          caravan_allowed: boolean | null
+          motorhome_allowed: boolean | null
+          tent_allowed: boolean | null
+          has_electricity: boolean | null
+          has_fresh_water: boolean | null
+          has_shower: boolean | null
+          has_laundry: boolean | null
+          has_dishwashing_area: boolean | null
+          has_grey_water_disposal: boolean | null
+          has_black_water_disposal: boolean | null
+          has_chemical_toilet_disposal: boolean | null
+          has_dump_station: boolean | null
+          has_waste_disposal: boolean | null
+          has_recycling: boolean | null
+          has_bbq_area: boolean | null
+          has_fire_pit: boolean | null
+          has_playground: boolean | null
+          has_pool: boolean | null
+          has_beach: boolean | null
+          nudism_allowed: boolean | null
+          nudism_only: boolean | null
+          has_guided_tours: boolean | null
+          has_audio_guide: boolean | null
+          has_visitor_center: boolean | null
+          has_lockers: boolean | null
+          photography_allowed: boolean | null
+          osm_source_id: number | null
+          osm_id: number | null
+          osm_type: string | null
+          osm_version: number | null
+          osm_timestamp: string | null
+        }
+        Insert: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          osm_source_id?: number | null
+          osm_id?: number | null
+          osm_type?: string | null
+          osm_version?: number | null
+          osm_timestamp?: string | null
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          is_current?: boolean
+          created_at?: string
+          updated_at?: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          osm_source_id?: number | null
+          osm_id?: number | null
+          osm_type?: string | null
+          osm_version?: number | null
+          osm_timestamp?: string | null
+        }
+      }
+      place_google_properties: {
+        Row: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at: string | null
+          name: string | null
+          description: string | null
+          place_type: string | null
+          source_place_type: string | null
+          source_categories: unknown[] | null
+          country_code: string | null
+          region: string | null
+          city: string | null
+          postcode: string | null
+          address: string | null
+          source_lat: number | null
+          source_lon: number | null
+          website: string | null
+          phone: string | null
+          email: string | null
+          opening_hours: string | null
+          fee_info: string | null
+          wheelchair_accessible: boolean | null
+          family_friendly: boolean | null
+          pets_allowed: boolean | null
+          indoor: boolean | null
+          outdoor: boolean | null
+          entry_fee_required: boolean | null
+          reservation_required: boolean | null
+          overnight_stay_allowed: boolean | null
+          has_parking: boolean | null
+          has_restrooms: boolean | null
+          has_drinking_water: boolean | null
+          has_wifi: boolean | null
+          has_shop: boolean | null
+          has_restaurant: boolean | null
+          has_cafe: boolean | null
+          caravan_allowed: boolean | null
+          motorhome_allowed: boolean | null
+          tent_allowed: boolean | null
+          has_electricity: boolean | null
+          has_fresh_water: boolean | null
+          has_shower: boolean | null
+          has_laundry: boolean | null
+          has_dishwashing_area: boolean | null
+          has_grey_water_disposal: boolean | null
+          has_black_water_disposal: boolean | null
+          has_chemical_toilet_disposal: boolean | null
+          has_dump_station: boolean | null
+          has_waste_disposal: boolean | null
+          has_recycling: boolean | null
+          has_bbq_area: boolean | null
+          has_fire_pit: boolean | null
+          has_playground: boolean | null
+          has_pool: boolean | null
+          has_beach: boolean | null
+          nudism_allowed: boolean | null
+          nudism_only: boolean | null
+          has_guided_tours: boolean | null
+          has_audio_guide: boolean | null
+          has_visitor_center: boolean | null
+          has_lockers: boolean | null
+          photography_allowed: boolean | null
+          google_source_id: number | null
+          google_place_id: string | null
+          rating: number | null
+          review_count: number | null
+          business_status: string | null
+          expires_at: string | null
+        }
+        Insert: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          google_source_id?: number | null
+          google_place_id?: string | null
+          rating?: number | null
+          review_count?: number | null
+          business_status?: string | null
+          expires_at?: string | null
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          is_current?: boolean
+          created_at?: string
+          updated_at?: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          google_source_id?: number | null
+          google_place_id?: string | null
+          rating?: number | null
+          review_count?: number | null
+          business_status?: string | null
+          expires_at?: string | null
+        }
+      }
+      place_llm_properties: {
+        Row: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at: string | null
+          name: string | null
+          description: string | null
+          place_type: string | null
+          source_place_type: string | null
+          source_categories: unknown[] | null
+          country_code: string | null
+          region: string | null
+          city: string | null
+          postcode: string | null
+          address: string | null
+          source_lat: number | null
+          source_lon: number | null
+          website: string | null
+          phone: string | null
+          email: string | null
+          opening_hours: string | null
+          fee_info: string | null
+          wheelchair_accessible: boolean | null
+          family_friendly: boolean | null
+          pets_allowed: boolean | null
+          indoor: boolean | null
+          outdoor: boolean | null
+          entry_fee_required: boolean | null
+          reservation_required: boolean | null
+          overnight_stay_allowed: boolean | null
+          has_parking: boolean | null
+          has_restrooms: boolean | null
+          has_drinking_water: boolean | null
+          has_wifi: boolean | null
+          has_shop: boolean | null
+          has_restaurant: boolean | null
+          has_cafe: boolean | null
+          caravan_allowed: boolean | null
+          motorhome_allowed: boolean | null
+          tent_allowed: boolean | null
+          has_electricity: boolean | null
+          has_fresh_water: boolean | null
+          has_shower: boolean | null
+          has_laundry: boolean | null
+          has_dishwashing_area: boolean | null
+          has_grey_water_disposal: boolean | null
+          has_black_water_disposal: boolean | null
+          has_chemical_toilet_disposal: boolean | null
+          has_dump_station: boolean | null
+          has_waste_disposal: boolean | null
+          has_recycling: boolean | null
+          has_bbq_area: boolean | null
+          has_fire_pit: boolean | null
+          has_playground: boolean | null
+          has_pool: boolean | null
+          has_beach: boolean | null
+          nudism_allowed: boolean | null
+          nudism_only: boolean | null
+          has_guided_tours: boolean | null
+          has_audio_guide: boolean | null
+          has_visitor_center: boolean | null
+          has_lockers: boolean | null
+          photography_allowed: boolean | null
+          llm_enrichment_id: number | null
+          provider: string | null
+          model: string | null
+          summary_de: string | null
+          trust_score: number | null
+          source_urls: Json | null
+        }
+        Insert: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          llm_enrichment_id?: number | null
+          provider?: string | null
+          model?: string | null
+          summary_de?: string | null
+          trust_score?: number | null
+          source_urls?: Json | null
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          is_current?: boolean
+          created_at?: string
+          updated_at?: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          llm_enrichment_id?: number | null
+          provider?: string | null
+          model?: string | null
+          summary_de?: string | null
+          trust_score?: number | null
+          source_urls?: Json | null
+        }
+      }
+      place_user_properties: {
+        Row: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at: string | null
+          name: string | null
+          description: string | null
+          place_type: string | null
+          source_place_type: string | null
+          source_categories: unknown[] | null
+          country_code: string | null
+          region: string | null
+          city: string | null
+          postcode: string | null
+          address: string | null
+          source_lat: number | null
+          source_lon: number | null
+          website: string | null
+          phone: string | null
+          email: string | null
+          opening_hours: string | null
+          fee_info: string | null
+          wheelchair_accessible: boolean | null
+          family_friendly: boolean | null
+          pets_allowed: boolean | null
+          indoor: boolean | null
+          outdoor: boolean | null
+          entry_fee_required: boolean | null
+          reservation_required: boolean | null
+          overnight_stay_allowed: boolean | null
+          has_parking: boolean | null
+          has_restrooms: boolean | null
+          has_drinking_water: boolean | null
+          has_wifi: boolean | null
+          has_shop: boolean | null
+          has_restaurant: boolean | null
+          has_cafe: boolean | null
+          caravan_allowed: boolean | null
+          motorhome_allowed: boolean | null
+          tent_allowed: boolean | null
+          has_electricity: boolean | null
+          has_fresh_water: boolean | null
+          has_shower: boolean | null
+          has_laundry: boolean | null
+          has_dishwashing_area: boolean | null
+          has_grey_water_disposal: boolean | null
+          has_black_water_disposal: boolean | null
+          has_chemical_toilet_disposal: boolean | null
+          has_dump_station: boolean | null
+          has_waste_disposal: boolean | null
+          has_recycling: boolean | null
+          has_bbq_area: boolean | null
+          has_fire_pit: boolean | null
+          has_playground: boolean | null
+          has_pool: boolean | null
+          has_beach: boolean | null
+          nudism_allowed: boolean | null
+          nudism_only: boolean | null
+          has_guided_tours: boolean | null
+          has_audio_guide: boolean | null
+          has_visitor_center: boolean | null
+          has_lockers: boolean | null
+          photography_allowed: boolean | null
+          user_id: string
+        }
+        Insert: {
+          id: number
+          place_id: number
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          user_id: string
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          is_current?: boolean
+          created_at?: string
+          updated_at?: string
+          source_updated_at?: string | null
+          name?: string | null
+          description?: string | null
+          place_type?: string | null
+          source_place_type?: string | null
+          source_categories?: unknown[] | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          source_lat?: number | null
+          source_lon?: number | null
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          wheelchair_accessible?: boolean | null
+          family_friendly?: boolean | null
+          pets_allowed?: boolean | null
+          indoor?: boolean | null
+          outdoor?: boolean | null
+          entry_fee_required?: boolean | null
+          reservation_required?: boolean | null
+          overnight_stay_allowed?: boolean | null
+          has_parking?: boolean | null
+          has_restrooms?: boolean | null
+          has_drinking_water?: boolean | null
+          has_wifi?: boolean | null
+          has_shop?: boolean | null
+          has_restaurant?: boolean | null
+          has_cafe?: boolean | null
+          caravan_allowed?: boolean | null
+          motorhome_allowed?: boolean | null
+          tent_allowed?: boolean | null
+          has_electricity?: boolean | null
+          has_fresh_water?: boolean | null
+          has_shower?: boolean | null
+          has_laundry?: boolean | null
+          has_dishwashing_area?: boolean | null
+          has_grey_water_disposal?: boolean | null
+          has_black_water_disposal?: boolean | null
+          has_chemical_toilet_disposal?: boolean | null
+          has_dump_station?: boolean | null
+          has_waste_disposal?: boolean | null
+          has_recycling?: boolean | null
+          has_bbq_area?: boolean | null
+          has_fire_pit?: boolean | null
+          has_playground?: boolean | null
+          has_pool?: boolean | null
+          has_beach?: boolean | null
+          nudism_allowed?: boolean | null
+          nudism_only?: boolean | null
+          has_guided_tours?: boolean | null
+          has_audio_guide?: boolean | null
+          has_visitor_center?: boolean | null
+          has_lockers?: boolean | null
+          photography_allowed?: boolean | null
+          user_id?: string
+        }
+      }
     }
     Views: {
       campsite_full: {
@@ -2263,12 +3104,7 @@ export interface Database {
       }
     }
     Functions: {
-      get_place_source_bundle: {
-        Args: {
-          place_id: number
-        }
-        Returns: Json
-      }
+      [_ in never]: never
     }
     Enums: {
       factor_type: 'totp' | 'webauthn' | 'phone'
