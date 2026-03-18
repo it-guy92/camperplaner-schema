@@ -635,179 +635,30 @@ export interface Database {
       places: {
         Row: {
           id: number
-          place_type: string
-          name: string
           geom: string
           lat: number | null
           lon: number | null
-          country_code: string | null
-          region: string | null
-          city: string | null
-          postcode: string | null
-          address: string | null
-          has_toilet: boolean
-          has_shower: boolean
-          has_electricity: boolean
-          has_water: boolean
-          has_wifi: boolean
-          pet_friendly: boolean
-          caravan_allowed: boolean
-          motorhome_allowed: boolean
-          tent_allowed: boolean
-          website: string | null
-          phone: string | null
-          email: string | null
-          opening_hours: string | null
-          fee_info: string | null
-          source_primary: string
-          data_confidence: number | null
-          last_seen_at: string | null
-          last_enriched_at: string | null
           is_active: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id: number
-          place_type: string
-          name: string
           geom: string
           lat?: number | null
           lon?: number | null
-          country_code?: string | null
-          region?: string | null
-          city?: string | null
-          postcode?: string | null
-          address?: string | null
-          has_toilet: boolean
-          has_shower: boolean
-          has_electricity: boolean
-          has_water: boolean
-          has_wifi: boolean
-          pet_friendly: boolean
-          caravan_allowed: boolean
-          motorhome_allowed: boolean
-          tent_allowed: boolean
-          website?: string | null
-          phone?: string | null
-          email?: string | null
-          opening_hours?: string | null
-          fee_info?: string | null
-          source_primary: string
-          data_confidence?: number | null
-          last_seen_at?: string | null
-          last_enriched_at?: string | null
           is_active: boolean
           created_at: string
           updated_at: string
         }
         Update: {
           id?: number
-          place_type?: string
-          name?: string
           geom?: string
           lat?: number | null
           lon?: number | null
-          country_code?: string | null
-          region?: string | null
-          city?: string | null
-          postcode?: string | null
-          address?: string | null
-          has_toilet?: boolean
-          has_shower?: boolean
-          has_electricity?: boolean
-          has_water?: boolean
-          has_wifi?: boolean
-          pet_friendly?: boolean
-          caravan_allowed?: boolean
-          motorhome_allowed?: boolean
-          tent_allowed?: boolean
-          website?: string | null
-          phone?: string | null
-          email?: string | null
-          opening_hours?: string | null
-          fee_info?: string | null
-          source_primary?: string
-          data_confidence?: number | null
-          last_seen_at?: string | null
-          last_enriched_at?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
-        }
-      }
-      osm_source: {
-        Row: {
-          id: number
-          place_id: number
-          osm_type: string
-          osm_id: number
-          osm_version: number | null
-          tags: Json
-          raw_name: string | null
-          source_snapshot_date: string | null
-          imported_at: string
-          first_seen_at: string
-          last_seen_at: string
-          last_import_run_id: number | null
-          geometry_kind: string | null
-          geometry_hash: string | null
-          centroid: string | null
-          geom: string | null
-          osm_timestamp: string | null
-          osmium_unique_id: string | null
-          first_seen_snapshot_id: string | null
-          last_seen_snapshot_id: string | null
-          is_current: boolean
-          source_metadata: Json
-        }
-        Insert: {
-          id: number
-          place_id: number
-          osm_type: string
-          osm_id: number
-          osm_version?: number | null
-          tags: Json
-          raw_name?: string | null
-          source_snapshot_date?: string | null
-          imported_at: string
-          first_seen_at: string
-          last_seen_at: string
-          last_import_run_id?: number | null
-          geometry_kind?: string | null
-          geometry_hash?: string | null
-          centroid?: string | null
-          geom?: string | null
-          osm_timestamp?: string | null
-          osmium_unique_id?: string | null
-          first_seen_snapshot_id?: string | null
-          last_seen_snapshot_id?: string | null
-          is_current: boolean
-          source_metadata: Json
-        }
-        Update: {
-          id?: number
-          place_id?: number
-          osm_type?: string
-          osm_id?: number
-          osm_version?: number | null
-          tags?: Json
-          raw_name?: string | null
-          source_snapshot_date?: string | null
-          imported_at?: string
-          first_seen_at?: string
-          last_seen_at?: string
-          last_import_run_id?: number | null
-          geometry_kind?: string | null
-          geometry_hash?: string | null
-          centroid?: string | null
-          geom?: string | null
-          osm_timestamp?: string | null
-          osmium_unique_id?: string | null
-          first_seen_snapshot_id?: string | null
-          last_seen_snapshot_id?: string | null
-          is_current?: boolean
-          source_metadata?: Json
         }
       }
       place_enrichment: {
@@ -1560,203 +1411,6 @@ export interface Database {
           reviewed_by?: string | null
           resolution?: string | null
           resolution_notes?: string | null
-        }
-      }
-      place_llm_enrichments: {
-        Row: {
-          id: number
-          place_id: number
-          job_id: number | null
-          provider: string
-          model: string
-          prompt_version: string | null
-          summary_de: string | null
-          confidence: number | null
-          hallucination_risk: number | null
-          token_input: number | null
-          token_output: number | null
-          cost_usd: number | null
-          status: string
-          started_at: string | null
-          completed_at: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id: number
-          place_id: number
-          job_id?: number | null
-          provider: string
-          model: string
-          prompt_version?: string | null
-          summary_de?: string | null
-          confidence?: number | null
-          hallucination_risk?: number | null
-          token_input?: number | null
-          token_output?: number | null
-          cost_usd?: number | null
-          status: string
-          started_at?: string | null
-          completed_at?: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-          created_by?: string | null
-        }
-        Update: {
-          id?: number
-          place_id?: number
-          job_id?: number | null
-          provider?: string
-          model?: string
-          prompt_version?: string | null
-          summary_de?: string | null
-          confidence?: number | null
-          hallucination_risk?: number | null
-          token_input?: number | null
-          token_output?: number | null
-          cost_usd?: number | null
-          status?: string
-          started_at?: string | null
-          completed_at?: string | null
-          is_current?: boolean
-          created_at?: string
-          updated_at?: string
-          created_by?: string | null
-        }
-      }
-      place_google_sources: {
-        Row: {
-          id: number
-          place_id: number
-          google_place_id: string
-          name: string | null
-          formatted_address: string | null
-          phone: string | null
-          website: string | null
-          rating: number | null
-          review_count: number | null
-          business_status: string | null
-          lat: number | null
-          lon: number | null
-          raw_payload: Json | null
-          fetched_at: string
-          expires_at: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: number
-          place_id: number
-          google_place_id: string
-          name?: string | null
-          formatted_address?: string | null
-          phone?: string | null
-          website?: string | null
-          rating?: number | null
-          review_count?: number | null
-          business_status?: string | null
-          lat?: number | null
-          lon?: number | null
-          raw_payload?: Json | null
-          fetched_at: string
-          expires_at?: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-        }
-        Update: {
-          id?: number
-          place_id?: number
-          google_place_id?: string
-          name?: string | null
-          formatted_address?: string | null
-          phone?: string | null
-          website?: string | null
-          rating?: number | null
-          review_count?: number | null
-          business_status?: string | null
-          lat?: number | null
-          lon?: number | null
-          raw_payload?: Json | null
-          fetched_at?: string
-          expires_at?: string | null
-          is_current?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      place_google_reviews: {
-        Row: {
-          id: number
-          google_source_id: number
-          author_name: string | null
-          rating: number | null
-          language_code: string | null
-          review_text: string | null
-          review_time: string | null
-          relative_time_description: string | null
-          google_review_id: string | null
-          created_at: string
-        }
-        Insert: {
-          id: number
-          google_source_id: number
-          author_name?: string | null
-          rating?: number | null
-          language_code?: string | null
-          review_text?: string | null
-          review_time?: string | null
-          relative_time_description?: string | null
-          google_review_id?: string | null
-          created_at: string
-        }
-        Update: {
-          id?: number
-          google_source_id?: number
-          author_name?: string | null
-          rating?: number | null
-          language_code?: string | null
-          review_text?: string | null
-          review_time?: string | null
-          relative_time_description?: string | null
-          google_review_id?: string | null
-          created_at?: string
-        }
-      }
-      place_google_photos: {
-        Row: {
-          id: number
-          google_source_id: number
-          photo_reference: string
-          width: number | null
-          height: number | null
-          attribution: string | null
-          google_photo_id: string | null
-          created_at: string
-        }
-        Insert: {
-          id: number
-          google_source_id: number
-          photo_reference: string
-          width?: number | null
-          height?: number | null
-          attribution?: string | null
-          google_photo_id?: string | null
-          created_at: string
-        }
-        Update: {
-          id?: number
-          google_source_id?: number
-          photo_reference?: string
-          width?: number | null
-          height?: number | null
-          attribution?: string | null
-          google_photo_id?: string | null
-          created_at?: string
         }
       }
       google_refresh_claims: {
@@ -2748,6 +2402,18 @@ export interface Database {
           type: string | null
         }
       }
+      campsite_price_summary: {
+        Row: {
+          place_id: string | null
+          osm_place_id: string | null
+          price_count: number | null
+          avg_price: number | null
+          min_price: number | null
+          max_price: number | null
+          avg_rating: number | null
+          review_count: number | null
+        }
+      }
       campsite_api_read_model: {
         Row: {
           place_id: string | null
@@ -2790,18 +2456,22 @@ export interface Database {
           google_rating: number | null
           rating: number | null
           type: string | null
-        }
-      }
-      campsite_price_summary: {
-        Row: {
-          place_id: string | null
-          osm_place_id: string | null
-          price_count: number | null
-          avg_price: number | null
-          min_price: number | null
-          max_price: number | null
-          avg_rating: number | null
-          review_count: number | null
+          has_toilet: boolean | null
+          has_shower: boolean | null
+          has_electricity: boolean | null
+          has_dogs_allowed: boolean | null
+          has_wifi: boolean | null
+          has_beach: boolean | null
+          has_laundry: boolean | null
+          has_restaurant: boolean | null
+          has_bar: boolean | null
+          has_shop: boolean | null
+          has_pool: boolean | null
+          has_playground: boolean | null
+          has_dump_station: boolean | null
+          has_water: boolean | null
+          has_washing_machine: boolean | null
+          has_dishwasher: boolean | null
         }
       }
     }

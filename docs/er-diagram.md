@@ -2,7 +2,7 @@
 
 > **Schema Repository:** Canonical source of truth
 > **Generated:** 2026-03-18
-> **Migration Head:** 20260318214500_backfill_missing_llm_property_rows.sql
+> **Migration Head:** 20260318230000_finalize_property_cutover_and_legacy_cleanup.sql
 
 ---
 
@@ -1378,15 +1378,12 @@ erDiagram
 | places | place_google_properties | place_id | Place has Google properties |
 | places | place_llm_properties | place_id | Place has LLM properties |
 | places | place_user_properties | place_id | Place has user properties |
-| enrichment_jobs | place_llm_enrichments | job_id | Job produces LLM results |
-| place_google_sources | place_google_reviews | google_source_id | Source has reviews |
-| place_google_sources | place_google_photos | google_source_id | Source has photos |
 
 ---
 
 ## Removed Tables
 
-The following tables have been **dropped** as of migration `20260318214500_backfill_missing_llm_property_rows.sql` and are no longer part of the schema:
+The following tables have been **dropped** by Phase 2/3 migrations and are no longer part of the active schema:
 
 | Table Name | Reason |
 |------------|--------|
@@ -1398,6 +1395,11 @@ The following tables have been **dropped** as of migration `20260318214500_backf
 | `place_source_evidence_runs` | Consolidated into property tables |
 | `place_evidence_sources` | Consolidated into property tables |
 | `place_evidence_markers` | Consolidated into property tables |
+| `osm_source` | Replaced by `place_osm_properties` as runtime source row |
+| `place_llm_enrichments` | Replaced by `place_llm_properties` |
+| `place_google_sources` | Replaced by `place_google_properties` |
+| `place_google_reviews` | Removed with Google source table cleanup |
+| `place_google_photos` | Removed with Google source table cleanup |
 
 ---
 
@@ -1420,9 +1422,10 @@ These indexes ensure that each place can have only **one current** OSM, Google, 
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql` | 2026-03-18 | **BREAKING:** Cut over RPC/view to aligned property tables, dropped remaining legacy source tables, trimmed `places` business columns; **current head** |
 | `20260318200000` | 2026-03-18 | Initial migration creating property tables |
 | `20260318213000` | 2026-03-18 | Schema refinement and index creation |
-| `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 | Backfill missing LLM property rows; **current head** |
+| `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 | Backfill missing LLM property rows |
 
 ---
 
@@ -1433,13 +1436,13 @@ These indexes ensure that each place can have only **one current** OSM, Google, 
 | User & Trip Management | 6 |
 | Places & Campsites (Core) | 5 |
 | Place Properties Tables | 4 |
-| Legacy Source Tables | 6 |
-| LLM Enrichment | 2 |
+| Legacy Source Tables | 0 |
+| LLM Enrichment | 1 |
 | Evidence Collection | 3 |
-| Google Sources | 3 |
+| Google Sources | 0 |
 | Import & Queue System | 8 |
 | Audit & Settings | 5 |
-| **Total Tables** | **42** |
+| **Total Tables** | **36** |
 
 ---
 
@@ -1464,7 +1467,7 @@ These indexes ensure that each place can have only **one current** OSM, Google, 
 - **Foreign Keys**: Relationships are shown with FK markers
 - **Timestamps**: Most tables have `created_at` and `updated_at` timestamps
 - **Soft Deletes**: Uses `is_active` flags instead of hard deletes
-- **Current Records**: Source tables use `is_current` to mark active records
+- **Current Records**: Aligned property tables use `is_current` to mark active records
 - **Partial Unique Indexes**: Used to enforce uniqueness only on active records
 - **Spatial Data**: Uses PostGIS `geometry` and `geography` types
 - **JSONB**: Used for flexible/unstructured data

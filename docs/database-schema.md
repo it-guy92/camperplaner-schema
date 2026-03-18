@@ -574,72 +574,20 @@ User saved favorites.
 ### Places & Campsites Tables
 
 #### `places`
-Main places table with canonical data.
-
-> **Note:** This table still contains all business columns (has_toilet, has_shower, has_electricity, has_water, has_wifi, pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed, website, phone, email, opening_hours, fee_info, source_primary, data_confidence, etc.). Column trimming to align with the new property table structure is planned for a future migration.
+Minimal place identity and geospatial anchor table.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | bigint | PK, NOT NULL | Unique place identifier |
-| `place_type` | text | NOT NULL | Place type enum |
-| `name` | text | NOT NULL | Place name |
 | `geom` | geometry | NOT NULL | PostGIS geometry |
 | `lat` | numeric | NULL | Latitude |
 | `lon` | numeric | NULL | Longitude |
-| `country_code` | text | NULL | ISO country code |
-| `region` | text | NULL | Region/state |
-| `city` | text | NULL | City name |
-| `postcode` | text | NULL | Postal code |
-| `address` | text | NULL | Full address |
-| `has_toilet` | boolean | NOT NULL | Has toilet facility |
-| `has_shower` | boolean | NOT NULL | Has shower facility |
-| `has_electricity` | boolean | NOT NULL | Has electricity |
-| `has_water` | boolean | NOT NULL | Has water |
-| `has_wifi` | boolean | NOT NULL | Has WiFi |
-| `pet_friendly` | boolean | NOT NULL | Pet friendly |
-| `caravan_allowed` | boolean | NOT NULL | Caravan allowed |
-| `motorhome_allowed` | boolean | NOT NULL | Motorhome allowed |
-| `tent_allowed` | boolean | NOT NULL | Tent allowed |
-| `website` | text | NULL | Website URL |
-| `phone` | text | NULL | Phone number |
-| `email` | text | NULL | Email address |
-| `opening_hours` | text | NULL | Opening hours |
-| `fee_info` | text | NULL | Fee information |
-| `source_primary` | text | NOT NULL | Primary data source |
-| `data_confidence` | numeric | NULL | Confidence score |
-| `last_seen_at` | timestamptz | NULL | Last observed |
-| `last_enriched_at` | timestamptz | NULL | Last enriched |
 | `is_active` | boolean | NOT NULL | Active flag |
 | `created_at` | timestamptz | NOT NULL | Creation time |
 | `updated_at` | timestamptz | NOT NULL | Last update |
 
 #### `osm_source`
-OSM source data tracking.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
-| `osm_type` | text | NOT NULL | OSM object type |
-| `osm_id` | bigint | NOT NULL | OSM object ID |
-| `osm_version` | integer | NULL | OSM version |
-| `tags` | jsonb | NOT NULL | OSM tags |
-| `raw_name` | text | NULL | Raw OSM name |
-| `source_snapshot_date` | timestamptz | NULL | Snapshot date |
-| `imported_at` | timestamptz | NOT NULL | Import timestamp |
-| `first_seen_at` | timestamptz | NOT NULL | First seen |
-| `last_seen_at` | timestamptz | NOT NULL | Last seen |
-| `last_import_run_id` | bigint | NULL | Import run reference |
-| `geometry_kind` | text | NULL | Geometry type |
-| `geometry_hash` | text | NULL | Geometry hash |
-| `centroid` | geometry | NULL | Centroid point |
-| `geom` | geometry | NULL | Full geometry |
-| `osm_timestamp` | timestamptz | NULL | OSM timestamp |
-| `osmium_unique_id` | text | NULL | Osmium unique ID |
-| `first_seen_snapshot_id` | text | NULL | First snapshot ID |
-| `last_seen_snapshot_id` | text | NULL | Last snapshot ID |
-| `is_current` | boolean | NOT NULL | Current flag |
-| `source_metadata` | jsonb | NOT NULL | Source metadata |
+Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
 
 #### `campsites_cache`
 Cached campsite data.
@@ -737,85 +685,18 @@ Place enrichment data and LLM processing.
 ### LLM Enrichment Tables
 
 #### `place_llm_enrichments`
-LLM output storage (parent table).
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
-| `job_id` | bigint | FK → enrichment_jobs.id, NULL | Job reference |
-| `provider` | text | NOT NULL | LLM provider |
-| `model` | text | NOT NULL | Model identifier |
-| `prompt_version` | text | NULL | Prompt version |
-| `summary_de` | text | NULL | German summary |
-| `confidence` | numeric | NULL | Confidence (0-1) |
-| `hallucination_risk` | numeric | NULL | Hallucination risk (0-1) |
-| `token_input` | integer | NULL | Input tokens |
-| `token_output` | integer | NULL | Output tokens |
-| `cost_usd` | numeric | NULL | Cost in USD |
-| `status` | text | NOT NULL | Processing status |
-| `started_at` | timestamptz | NULL | Start time |
-| `completed_at` | timestamptz | NULL | Completion time |
-| `is_current` | boolean | NOT NULL | Current flag |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-| `updated_at` | timestamptz | NOT NULL | Update time |
-| `created_by` | text | NULL | Creator reference |
+Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
 
 ### Google Sources Tables
 
 #### `place_google_sources`
-Google Places API cache (parent table).
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
-| `google_place_id` | text | NOT NULL | Google Place ID |
-| `name` | text | NULL | Place name |
-| `formatted_address` | text | NULL | Full address |
-| `phone` | text | NULL | Phone number |
-| `website` | text | NULL | Website URL |
-| `rating` | numeric | NULL | Google rating |
-| `review_count` | integer | NULL | Number of reviews |
-| `business_status` | text | NULL | Business status |
-| `lat` | numeric | NULL | Latitude |
-| `lon` | numeric | NULL | Longitude |
-| `raw_payload` | jsonb | NULL | Full API response |
-| `fetched_at` | timestamptz | NOT NULL | Fetch time |
-| `expires_at` | timestamptz | NULL | Expiration time |
-| `is_current` | boolean | NOT NULL | Current flag |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-| `updated_at` | timestamptz | NOT NULL | Update time |
+Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
 
 #### `place_google_reviews`
-Individual Google reviews.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
-| `author_name` | text | NULL | Reviewer name |
-| `rating` | integer | NULL | Star rating |
-| `language_code` | text | NULL | Language code |
-| `review_text` | text | NULL | Review content |
-| `review_time` | timestamptz | NULL | Review timestamp |
-| `relative_time_description` | text | NULL | Relative time |
-| `google_review_id` | text | NULL | Google review ID |
-| `created_at` | timestamptz | NOT NULL | Creation time |
+Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
 
 #### `place_google_photos`
-Google place photos.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
-| `photo_reference` | text | NOT NULL | Google photo token |
-| `width` | integer | NULL | Photo width |
-| `height` | integer | NULL | Photo height |
-| `attribution` | text | NULL | Attribution text |
-| `google_photo_id` | text | NULL | Google photo ID |
-| `created_at` | timestamptz | NOT NULL | Creation time |
+Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
 
 ### Queue & Import Tables
 
@@ -1095,9 +976,10 @@ Returns a complete source bundle for a place by its bigint id.
 ```json
 {
   "base": { /* places table row */ },
-  "osm": { /* current osm_source row or null */ },
-  "llm": { /* current place_llm_enrichments row or null */ },
-  "google": { /* current place_google_sources row or null */ },
+  "osm": { /* current place_osm_properties row or null */ },
+  "llm": { /* current place_llm_properties row or null */ },
+  "google": { /* current place_google_properties row or null */ },
+  "user": [ /* current place_user_properties rows */ ],
   "user_aggregates": {
     "review_count": 0,
     "avg_rating": null,
@@ -1131,10 +1013,7 @@ trips (id)
   └── trip_reminders (trip_id)
 
 places (id)
-  ├── osm_source (place_id)
   ├── place_enrichment (place_id)
-  ├── place_llm_enrichments (place_id)
-  ├── place_google_sources (place_id)
   ├── place_osm_properties (place_id)
   ├── place_google_properties (place_id)
   ├── place_llm_properties (place_id)
@@ -1146,15 +1025,7 @@ places (id)
 
 ```
 enrichment_jobs (id)
-  └── place_llm_enrichments (job_id)
-
-place_llm_enrichments (id)
-  └── place_llm_properties (llm_enrichment_id)
-
-place_google_sources (id)
-  ├── place_google_reviews (google_source_id)
-  ├── place_google_photos (google_source_id)
-  └── place_google_properties (google_source_id)
+  └── no direct FK from aligned property tables
 ```
 
 ### Property Table Relationships
@@ -1166,8 +1037,8 @@ places (id)
   ├── place_llm_properties (place_id)
   └── place_user_properties (place_id, user_id)
 
-osm_source (id)
-  └── place_osm_properties (osm_source_id)
+place_google_properties (id)
+  └── source-specific fields kept on aligned property row
 ```
 
 ---
@@ -1196,9 +1067,9 @@ JSONB columns are allowed ONLY for specific use cases:
 | Use Case | Example |
 |----------|---------|
 | Evidence storage | `source_evidence`, `evidence_markers` |
-| Vendor-specific details | `place_google_sources.raw_payload` |
+| Vendor-specific details | `campsites_cache.google_reviews` |
 | Debug metadata | `provider_attempts`, `metadata` |
-| Unprocessed source data | `osm_source.tags` |
+| Unprocessed source data | `campsites_cache.scraped_price_info` |
 | Source URLs array | `place_llm_properties.source_urls` |
 
 ### Aligned Property Table Pattern
@@ -1235,6 +1106,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_current
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql` | 2026-03-18 23:00 | **BREAKING:** Cut over `get_place_source_bundle` + `campsite_full` to aligned property tables; drop legacy source tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`, `place_google_reviews`, `place_google_photos`); trim `places` business columns |
 | `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 21:45 | Backfill missing historical rows from place_llm_enrichments into place_llm_properties |
 | `20260318213000_backfill_property_tables_and_drop_deprecated_fact_tables.sql` | 2026-03-18 21:30 | Backfill aligned property tables from existing source data; DROP 8 deprecated tables (place_google_amenities, place_google_types, place_llm_facts, place_llm_sources, place_llm_evidence_markers, place_source_evidence_runs, place_evidence_sources, place_evidence_markers) |
 | `20260318200000_add_property_tables.sql` | 2026-03-18 20:00 | Add Phase 2 aligned property tables (place_osm_properties, place_google_properties, place_llm_properties, place_user_properties) with shared columns, source-specific columns, current-row semantics, and proper indexes |
