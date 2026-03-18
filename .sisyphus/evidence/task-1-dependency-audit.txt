@@ -1,0 +1,173 @@
+# TASK 1: Dependency Audit - places Business Columns
+# Generated: 2026-03-18
+# Purpose: Inventory all consumers of deprecated places columns
+
+## DEPRECATED COLUMNS (to be removed from places table)
+- has_wifi, has_toilet, has_shower, has_electricity, has_water
+- source_primary, place_type, website, phone, email
+- opening_hours, fee_info, pet_friendly
+- caravan_allowed, motorhome_allowed, tent_allowed
+- geom, data_confidence, last_seen_at, last_enriched_at
+- address, city, region, postcode, name
+
+## REMAINING COLUMNS (staying in places table)
+- id, lat, lon, is_active, created_at, updated_at
+
+---
+
+## 1. SQL MIGRATION DEPENDENCIES
+
+### 1.1 campsite_full VIEW (CRITICAL - BREAKS ON REMOVAL)
+File: supabase/migrations/20260314221355_fix_campsite_full_required_fields_and_amenities.sql
+Lines referencing deprecated columns:
+  L4:  p.name
+  L6:  p.city, p.region
+  L7:  p.address
+  L12: p.source_primary
+  L15: 'source_primary', p.source_primary
+  L16: 'place_type', p.place_type
+  L18: 'city', p.city
+  L20: p.website
+  L21: p.opening_hours
+  L22: p.phone
+  L23: p.email
+  L36: p.place_type
+  L56: p.place_type::text = 'camp_site'
+  L57: p.place_type::text = 'camper_stop'
+  L60: p.has_toilet
+  L61: p.has_shower
+  L62: p.has_electricity
+  L63: p.pet_friendly
+  L64: p.has_wifi
+  L73: p.has_water
+
+DEPENDENCY COUNT: 21 column references from places table
+
+### 1.2 get_place_source_bundle RPC (CRITICAL - BREAKS ON REMOVAL)
+File: supabase/migrations/20260318130000_fix_get_place_source_bundle_ambiguous.sql
+Lines referencing deprecated columns:
+  L25: to_jsonb(p.*) -- SELECT * includes ALL places columns
+
+DEPENDENCY: Uses SELECT * from places, will include all deprecated columns in JSONB output
+
+### 1.3 Legacy migrations (REFERENCE ONLY - not applied)
+File: supabase/migrations-legacy/add-website-scraping-columns.sql
+  L10: website TEXT
+  L14: opening_hours TEXT
+  L18: contact_phone TEXT
+  L22: contact_email TEXT
+
+File: supabase/migrations/20260310000005_create_campsites_table.sql
+  L8:  website TEXT
+  L9:  opening_hours TEXT
+  L10: contact_phone TEXT
+  L11: contact_email TEXT
+  L24: place_types TEXT[]
+
+File: supabase/migrations/20260310000007_create_campsite_full_view.sql
+  L6-7: ST_Y/ST_X on location geometry
+  L11: c.website
+  L12: c.opening_hours
+  L13: c.contact_phone
+  L14: c.contact_email
+  L27: c.place_types
+
+File: supabase/migrations/20260310000010_migrate_campsites_data.sql
+  L7-11: website, opening_hours, contact_phone, contact_email
+  L23: place_types
+  L36-40: website, opening_hours, contact_phone, contact_email
+  L52: place_types
+
+---
+
+## 2. DOCUMENTATION DEPENDENCIES
+
+### 2.1 docs/database-schema.md
+Lines referencing deprecated places columns:
+  L236: place_type
+  L238: geom
+  L242-245: region, city, postcode, address
+  L246-254: has_toilet, has_shower, has_electricity, has_water, has_wifi, pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed
+  L255-259: website, phone, email, opening_hours, fee_info
+  L260-263: source_primary, data_confidence, last_seen_at, last_enriched_at
+  L798-802: has_toilet, has_shower, has_electricity, has_water, has_wifi (in campsite_full view docs)
+  L954-956: has_electricity, phone, website (in worker migration guide example)
+
+### 2.2 docs/database-access-audit.md
+Extensive references to deprecated columns in access audit tables (lines 433-460).
+Documents consumer access patterns from product and worker repos.
+
+### 2.3 docs/database-access-audit-summary.md
+  L20: References amenity columns (has_toilet, has_shower, etc.)
+
+### 2.4 docs/er-diagram.md
+  L112-139: Full places table definition including all deprecated columns
+  L874-885: Duplicate places definition in diagram
+
+### 2.5 docs/worker-schema-migration-guide.md
+  L297: opening_hours in google_place_sources
+  L372-375: has_electricity, has_water, phone, website in example schema
+  L381-382: amenities/contact JSONB examples
+
+---
+
+## 3. GENERATED TYPES DEPENDENCIES
+
+### 3.1 generated/database.types.ts
+Lines defining deprecated places columns:
+  L651: place_type: string
+  L653: geom: string
+  L657-660: region, city, postcode, address
+  L661-669: has_toilet, has_shower, has_electricity, has_water, has_wifi, pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed
+  L670-674: website, phone, email, opening_hours, fee_info
+  L675-678: source_primary, data_confidence, last_seen_at, last_enriched_at
+
+  L685-746: Insert/Update type definitions (same columns)
+
+  L2126-2130: campsite_full view return types (website, opening_hours, contact_phone, contact_email, scraped_website_url)
+  L2142: place_types
+  L2158-2171: amenity booleans in campsite_full view
+
+---
+
+## 4. SUMMARY
+
+### Critical Dependencies (WILL BREAK on column removal):
+1. campsite_full VIEW - 21 column references from places
+2. get_place_source_bundle RPC - SELECT * from places
+
+### Documentation Updates Required:
+1. docs/database-schema.md - Remove deprecated column definitions
+2. docs/database-access-audit.md - Update access patterns
+3. docs/database-access-audit-summary.md - Update summary
+4. docs/er-diagram.md - Remove deprecated columns from diagram
+5. docs/worker-schema-migration-guide.md - Update examples
+
+### Type Regeneration Required:
+1. generated/database.types.ts - Must regenerate after migration
+
+### Downstream Consumers (camperplaner-product):
+The database-access-audit.md identifies these product consumers of deprecated `places` columns:
+  - apps/web/scripts/analyze-germany.mjs
+  - apps/web/scripts/germany-e2e-final-report.mjs
+  - apps/web/scripts/germany-e2e-report.mjs
+  - apps/web/scripts/germany-e2e-test.mjs
+  - apps/web/src/app/api/admin/cutover/metrics/route.ts
+  - apps/web/src/app/api/admin/osm/status/route.ts
+  - apps/web/e2e/europe-import.spec.ts
+  - apps/web/src/app/admin/duplicates/page.tsx
+
+These consumers will break when deprecated columns are removed and must be notified.
+
+### Total Deprecated Column References:
+- SQL Migrations: 25+ direct references
+- Documentation: 100+ references
+- Generated Types: 50+ type definitions
+
+### Audit Verification:
+- [x] All SQL migrations searched for deprecated column references
+- [x] All documentation files searched for deprecated column references
+- [x] Generated types searched for deprecated column definitions
+- [x] campsite_full view dependencies documented (21 column refs)
+- [x] get_place_source_bundle RPC dependencies documented (SELECT *)
+- [x] Every grep match for deprecated columns is accounted for in this inventory

@@ -1,0 +1,204 @@
+# Task 4: Source Meaning Preservation Analysis
+# Generated: 2026-03-18
+# Purpose: Verify that Google type/amenity and LLM fact/source meaning is preserved during flattening
+
+================================================================================
+SECTION 1: GOOGLE AMENITY MEANING PRESERVATION
+================================================================================
+
+The place_google_amenities table uses a normalized fact model with:
+- amenity_key: Standardized identifier (e.g., 'electricity', 'water', 'wifi')
+- value_boolean/value_text/value_numeric: Typed values
+- is_verified: Whether explicitly confirmed vs inferred
+- confidence_score: Confidence level (1.0 = explicit, lower = inferred)
+- google_feature_type: Original Google type that indicated this amenity
+- source_section: Which part of Google response provided the info
+
+FLATTENING STRATEGY:
+Each amenity_key maps to a dedicated boolean column in place_google_properties.
+This preserves the core meaning (amenity present/absent) while simplifying the schema.
+
+MEANING PRESERVED:
+✓ Amenity presence/absence (boolean value)
+✓ Amenity identity (amenity_key → column name mapping is deterministic)
+
+MEANING DISCARDED:
+✗ Verification status (is_verified) - not needed in simplified model
+✗ Per-amenity confidence (confidence_score) - aggregated into overall data_confidence
+✗ Source provenance (google_feature_type, source_section) - process metadata
+
+RATIONALE:
+The simplified model prioritizes query performance and schema clarity over
+provenance detail. The amenity boolean is the business-meaningful fact.
+Verification status and source section are operational metadata useful for
+debugging but not for application logic.
+
+GOOGLE AMENITY KEY MAPPING (deterministic):
+electricity      → has_electricity
+water            → has_water
+wifi             → has_wifi
+shower           → has_shower
+restrooms        → has_toilet
+laundry          → has_laundry
+dump_station     → has_dump_station
+pet_friendly     → pet_friendly
+accessibility    → is_accessible
+pool             → has_pool
+playground       → has_playground
+restaurant       → has_restaurant
+bar              → has_bar
+shop             → has_shop
+beach            → has_beach
+washing_machine  → has_washing_machine
+dishwasher       → has_dishwasher
+
+================================================================================
+SECTION 2: GOOGLE TYPE MEANING PRESERVATION
+================================================================================
+
+The place_google_types table stores Google place categories with:
+- google_type: The Google Places API type (e.g., 'campground', 'rv_park')
+- is_primary: Whether this is the primary type
+
+FLATTENING STRATEGY:
+- Primary type (is_primary=true) → source_place_type (single value)
+- All types → source_categories (text[] array)
+
+MEANING PRESERVED:
+✓ Primary type designation (via source_place_type)
+✓ Complete type list (via source_categories array)
+✓ Type identity (google_type values preserved exactly)
+
+MEANING DISCARDED:
+None. All business-meaningful type information is preserved.
+
+RATIONALE:
+The two-column approach (single primary + array of all) preserves both the
+hierarchical designation and the complete categorization. This matches how
+Google's type system works: one primary type plus additional categories.
+
+================================================================================
+SECTION 3: LLM FACT MEANING PRESERVATION
+================================================================================
+
+The place_llm_facts table stores individual LLM-extracted facts with:
+- field_name: The field being described (e.g., 'has_electricity', 'phone')
+- value_text: The extracted value as text
+- value_type: Data type (string, boolean, number, array, object)
+- confidence: Confidence in this specific fact
+- provenance_kind: How the fact was derived (llm_extracted, source_verified, user_confirmed)
+
+FLATTENING STRATEGY:
+Each field_name maps to a dedicated typed column in place_llm_properties.
+The value_text is parsed according to value_type.
+
+MEANING PRESERVED:
+✓ Fact identity (field_name → column name mapping is deterministic)
+✓ Fact value (value_text parsed into appropriate type)
+✓ Overall confidence (aggregated into data_confidence)
+
+MEANING DISCARDED:
+✗ Per-fact confidence (confidence) - aggregated into overall score
+✗ Provenance kind (provenance_kind) - process metadata
+✗ Value type (value_type) - implicit in target column type
+
+RATIONALE:
+Per-fact confidence is useful for debugging but not for application logic.
+The simplified model uses a single confidence score per LLM enrichment.
+Provenance kind distinguishes how facts were derived, but the simplified
+model treats all LLM-extracted facts uniformly.
+
+LLM FACT FIELD MAPPING (deterministic):
+has_toilet        → has_toilet (boolean)
+has_shower        → has_shower (boolean)
+has_electricity   → has_electricity (boolean)
+has_water         → has_water (boolean)
+has_wifi          → has_wifi (boolean)
+pet_friendly      → pet_friendly (boolean)
+caravan_allowed   → caravan_allowed (boolean)
+motorhome_allowed → motorhome_allowed (boolean)
+tent_allowed      → tent_allowed (boolean)
+website           → website (text)
+phone             → phone (text)
+email             → email (text)
+opening_hours     → opening_hours (text)
+fee_info          → fee_info (text)
+name              → name (text)
+description       → description (text)
+
+================================================================================
+SECTION 4: LLM SOURCE MEANING PRESERVATION
+================================================================================
+
+The place_llm_sources table stores URLs cited by the LLM with:
+- source_url: Full URL of the source
+- source_domain: Domain extracted from URL
+- source_kind: Type of source (website, google_reviews, osm, user_submission, other)
+- trusted: Whether domain is in trusted list
+- relevance_score: Per-URL relevance (0-1)
+
+FLATTENING STRATEGY:
+All source_url values are aggregated into source_urls text[] in place_llm_properties.
+Trust information contributes to the overall trust_score.
+
+MEANING PRESERVED:
+✓ Complete URL list (source_urls array)
+✓ Trust signal (contributes to trust_score)
+
+MEANING DISCARDED:
+✗ Source domain (source_domain) - derivable from URL
+✗ Source kind (source_kind) - classification detail
+✗ Per-URL relevance (relevance_score) - aggregated into trust_score
+
+RATIONALE:
+The URL itself contains the domain. Source kind is a classification detail
+not needed for application logic. Per-URL relevance is useful for ranking
+but the simplified model uses a single trust score.
+
+================================================================================
+SECTION 5: CROSS-SOURCE MEANING PRESERVATION
+================================================================================
+
+The new property tables preserve cross-source meaning through:
+
+1. ALIGNED SHARED COLUMNS
+   All four property tables (OSM, Google, LLM, User) share the same set of
+   property columns (has_toilet, has_shower, website, phone, etc.).
+   This enables deterministic resolution priority: User → OSM → Google → LLM.
+
+2. SOURCE-SPECIFIC METADATA
+   Each property table includes source-specific columns:
+   - OSM: osm_type, osm_id, tags
+   - Google: google_place_id, rating, review_count, business_status
+   - LLM: provider, model, summary_de, hallucination_risk
+   - User: user_id, correction_reason
+
+3. CURRENT-ROW SEMANTICS
+   Each source maintains one current row per place (or per user for User properties).
+   This preserves the temporal aspect of source data without cluttering the schema.
+
+4. NULL = NO CLAIM SEMANTICS
+   Booleans default to NULL (not false) to distinguish "source claims false"
+   from "source made no claim". This preserves the semantic difference between
+   explicit negative claims and absence of information.
+
+================================================================================
+SECTION 6: VERIFICATION - MEANING PRESERVATION COMPLETENESS
+================================================================================
+
+VERIFICATION CHECKLIST:
+✓ Every Google amenity key has a deterministic column mapping
+✓ Google type primary/all distinction is preserved
+✓ Every LLM fact field_name has a deterministic column mapping
+✓ LLM source URLs are preserved in aggregate
+✓ Cross-source resolution priority is maintained
+✓ NULL vs false semantics are preserved
+✓ Source-specific metadata is retained in each property table
+✓ 1:n relationships (reviews, photos) remain as separate tables
+
+CONCLUSION:
+All business-meaningful information from deprecated tables is preserved in the
+new property tables. Discarded fields are operational metadata (verification
+status, per-fact confidence, source provenance) that serve debugging but not
+application logic. The simplified model prioritizes query performance and
+schema clarity while maintaining complete business semantics.

@@ -1,0 +1,103 @@
+# TASK 1: Read Model Breakpoints - places Business Columns
+# Generated: 2026-03-18
+# Purpose: Identify which read models depend on deprecated places columns
+
+## READ MODEL DEFINITION
+A "read model" is any database object (view, RPC, function) that READS from the places table.
+
+---
+
+## 1. campsite_full VIEW
+
+### Status: ACTIVE VIEW
+### File: supabase/migrations/20260314221355_fix_campsite_full_required_fields_and_amenities.sql
+### Created: 2026-03-14
+
+### Dependencies on Deprecated places Columns:
+
+| Column | Usage | Line | Impact |
+|--------|-------|------|--------|
+| name | SELECT p.name | L4 | Output field |
+| city | CONCAT_WS for location | L6 | Computed field |
+| region | CONCAT_WS for location | L6 | Computed field |
+| address | Fallback for location | L7 | Computed field |
+| source_primary | SELECT + JSONB | L12, L15 | Output field |
+| place_type | JSONB + CASE + COALESCE | L16, L36, L56-57 | Output + computed |
+| city | JSONB osm_tags | L18 | Output field |
+| website | SELECT p.website | L20 | Output field |
+| opening_hours | SELECT p.opening_hours | L21 | Output field |
+| phone | SELECT AS contact_phone | L22 | Output field |
+| email | SELECT AS contact_email | L23 | Output field |
+| has_toilet | COALESCE boolean | L60 | Output field |
+| has_shower | COALESCE boolean | L61 | Output field |
+| has_electricity | COALESCE boolean | L62 | Output field |
+| pet_friendly | COALESCE AS has_dogs_allowed | L63 | Output field |
+| has_wifi | COALESCE boolean | L64 | Output field |
+| has_water | COALESCE boolean | L73 | Output field |
+
+### BREAKPOINT: This view MUST be rewritten before removing deprecated columns.
+### Required Action: Rewrite to join source tables (osm_source, place_google_sources, place_llm_enrichments) instead of reading from places.
+
+---
+
+## 2. get_place_source_bundle RPC
+
+### Status: ACTIVE RPC
+### File: supabase/migrations/20260318130000_fix_get_place_source_bundle_ambiguous.sql
+### Created: 2026-03-18
+
+### Dependencies on Deprecated places Columns:
+
+| Usage | Line | Impact |
+|-------|------|--------|
+| SELECT to_jsonb(p.*) FROM places p | L25 | Returns ALL places columns in JSONB |
+
+### BREAKPOINT: This RPC uses SELECT * which includes all deprecated columns.
+### Required Action: Replace SELECT * with explicit column list (id, lat, lon, is_active, created_at, updated_at) OR keep for backward compat during transition.
+
+---
+
+## 3. LEGACY VIEWS (Not Active - Reference Only)
+
+### 3.1 Original campsite_full (20260310000007)
+File: supabase/migrations/20260310000007_create_campsite_full_view.sql
+Status: SUPERSEDED by 20260314221355
+Dependencies: website, opening_hours, contact_phone, contact_email, place_types (via campsites_cache join)
+
+---
+
+## 4. MIGRATION IMPACT MATRIX
+
+### Phase 1: Pre-Migration (REQUIRED)
+| Action | Object | Risk |
+|--------|--------|------|
+| Rewrite | campsite_full VIEW | HIGH - breaks product queries |
+| Rewrite | get_place_source_bundle RPC | MEDIUM - breaks worker queries |
+| Update | docs/database-schema.md | LOW - documentation only |
+| Update | docs/er-diagram.md | LOW - documentation only |
+| Update | docs/database-access-audit.md | LOW - documentation only |
+
+### Phase 2: Migration Execution
+| Action | Object | Risk |
+|--------|--------|------|
+| Drop columns | places table | BLOCKED until Phase 1 complete |
+| Regenerate | database.types.ts | REQUIRED after migration |
+
+### Phase 3: Consumer Sync
+| Action | Object | Risk |
+|--------|--------|------|
+| Copy types | camperplaner-product | MEDIUM - type errors if not synced |
+| Copy types | camperplaner-worker | MEDIUM - type errors if not synced |
+
+---
+
+## 5. VERIFICATION CHECKLIST
+
+- [x] All SQL migrations searched for deprecated column references
+- [x] All documentation files searched for deprecated column references
+- [x] Generated types searched for deprecated column definitions
+- [x] campsite_full view dependencies documented (21 column refs)
+- [x] get_place_source_bundle RPC dependencies documented (SELECT *)
+- [x] Evidence saved to .sisyphus/evidence/
+- [x] Both read models explicitly flagged for cutover work (Tasks 13, 14)
+- [x] Every grep match for deprecated columns is accounted for in the inventory

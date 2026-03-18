@@ -1,0 +1,236 @@
+# TASK 14: Source Bundle RPC Contract Redesign
+# Generated: 2026-03-18
+# Purpose: Define new get_place_source_bundle RPC contract aligned with property tables
+
+## CONTRACT SUMMARY
+
+RPC: get_place_source_bundle(place_id BIGINT) RETURNS JSONB
+
+The RPC is redesigned to return minimal `places` data plus the new aligned property
+tables instead of the legacy source-family parent tables.
+
+---
+
+## OLD CONTRACT (DEPRECATED)
+
+Returns JSONB with keys:
+- `base`: Full places row (SELECT to_jsonb(p.*) — includes ALL 30+ columns)
+- `osm`: Current osm_source row (parent table, raw OSM data)
+- `llm`: Current place_llm_enrichments row (parent table, LLM processing metadata)
+- `google`: Current place_google_sources row (parent table, Google API cache)
+- `user_aggregates`: { review_count, avg_rating, favorite_count }
+
+### Problems with Old Contract:
+1. `base` includes 20+ deprecated business columns (has_toilet, website, phone, etc.)
+2. `osm` returns raw OSM source tracking data, not aligned properties
+3. `llm` returns LLM processing metadata (tokens, cost, status), not extracted facts
+4. `google` returns Google API cache metadata, not aligned properties
+5. No user property corrections
+6. No Google reviews or photos (1:n child data excluded)
+
+---
+
+## NEW CONTRACT (TARGET)
+
+Returns JSONB with keys:
+- `base`: Minimal places row (id, lat, lon, is_active, created_at, updated_at)
+- `osm_properties`: Current place_osm_properties row (aligned 55+5 columns)
+- `google_properties`: Current place_google_properties row (aligned 55+6 columns)
+- `llm_properties`: Current place_llm_properties row (aligned 55+6 columns)
+- `user_properties`: Current place_user_properties row (aligned 55+1 columns, per-user)
+- `google_reviews`: Array of place_google_reviews for current google_source_id
+- `google_photos`: Array of place_google_photos for current google_source_id
+- `user_aggregates`: { review_count, avg_rating, favorite_count }
+
+### Key Changes:
+1. `base` reduced from 30+ columns to 6 columns (minimal places)
+2. `osm` → `osm_properties`: Aligned property table with typed boolean columns
+3. `llm` → `llm_properties`: Extracted facts as columns, not processing metadata
+4. `google` → `google_properties`: Aligned property table with typed boolean columns
+5. NEW `user_properties`: User corrections with highest resolution priority
+6. NEW `google_reviews`: 1:n child data included as array
+7. NEW `google_photos`: 1:n child data included as array
+8. `user_aggregates`: Unchanged (review_count, avg_rating, favorite_count)
+
+---
+
+## JSONB STRUCTURE (NEW)
+
+```json
+{
+  "base": {
+    "id": 12345,
+    "lat": 48.123456,
+    "lon": 11.654321,
+    "is_active": true,
+    "created_at": "2026-01-01T00:00:00Z",
+    "updated_at": "2026-03-18T00:00:00Z"
+  },
+  "osm_properties": {
+    "id": 1,
+    "place_id": 12345,
+    "is_current": true,
+    "name": "Camping Am See",
+    "place_type": "camp_site",
+    "country_code": "DE",
+    "city": "München",
+    "has_electricity": true,
+    "has_shower": true,
+    "has_wifi": null,
+    "osm_id": 123456789,
+    "osm_type": "way",
+    "...": "..."
+  },
+  "google_properties": {
+    "id": 1,
+    "place_id": 12345,
+    "is_current": true,
+    "name": "Camping Am See",
+    "rating": 4.5,
+    "review_count": 42,
+    "google_place_id": "ChIJ...",
+    "has_electricity": true,
+    "has_wifi": true,
+    "...": "..."
+  },
+  "llm_properties": {
+    "id": 1,
+    "place_id": 12345,
+    "is_current": true,
+    "summary_de": "Ein schöner Campingplatz...",
+    "trust_score": 0.85,
+    "provider": "openai",
+    "has_electricity": true,
+    "...": "..."
+  },
+  "user_properties": {
+    "id": 1,
+    "place_id": 12345,
+    "is_current": true,
+    "user_id": "uuid-here",
+    "has_wifi": false,
+    "...": "..."
+  },
+  "google_reviews": [
+    {
+      "id": 1,
+      "google_source_id": 1,
+      "author_name": "John Doe",
+      "rating": 5,
+      "review_text": "Great place!",
+      "review_time": "2026-01-15T10:30:00Z"
+    }
+  ],
+  "google_photos": [
+    {
+      "id": 1,
+      "google_source_id": 1,
+      "photo_reference": "ATf...",
+      "width": 800,
+      "height": 600
+    }
+  ],
+  "user_aggregates": {
+    "review_count": 5,
+    "avg_rating": 4.20,
+    "favorite_count": 12
+  }
+}
+```
+
+---
+
+## RESOLUTION PRIORITY
+
+When resolving a property value from the bundle:
+1. user_properties (if non-NULL) — human corrections, highest priority
+2. osm_properties (if non-NULL) — community-verified data
+3. google_properties (if non-NULL) — commercial source
+4. llm_properties (if non-NULL) — AI-generated, lowest priority
+
+This priority is NOT enforced by the RPC — it returns all sources.
+The consumer (product/worker) implements the resolution logic.
+
+---
+
+## LEGACY TABLES IN BUNDLE
+
+### REPLACED (no longer returned as source keys):
+- `osm_source` → replaced by `place_osm_properties`
+  - Rationale: osm_source is raw import tracking data; properties are aligned business data
+- `place_llm_enrichments` → replaced by `place_llm_properties`
+  - Rationale: enrichments are processing metadata; properties are extracted facts
+- `place_google_sources` → replaced by `place_google_properties`
+  - Rationale: sources are API cache metadata; properties are aligned business data
+
+### RETAINED (included as separate keys):
+- `place_google_reviews` → `google_reviews` key (1:n, cannot flatten)
+- `place_google_photos` → `google_photos` key (1:n, cannot flatten)
+
+### RETAINED (unchanged):
+- `campsite_reviews` → used for user_aggregates.review_count, user_aggregates.avg_rating
+- `favorites` → used for user_aggregates.favorite_count
+
+---
+
+## DEPENDENCY CHAIN
+
+### Property Tables (must exist):
+- place_osm_properties (migration: 20260318200000_add_property_tables.sql)
+- place_google_properties (migration: 20260318200000_add_property_tables.sql)
+- place_llm_properties (migration: 20260318200000_add_property_tables.sql)
+- place_user_properties (migration: 20260318200000_add_property_tables.sql)
+
+### Child Tables (must exist):
+- place_google_reviews (existing, FK: google_source_id → place_google_sources.id)
+- place_google_photos (existing, FK: google_source_id → place_google_sources.id)
+
+### Join Path for Reviews/Photos:
+place_google_properties.google_source_id → place_google_sources.id → place_google_reviews.google_source_id
+place_google_properties.google_source_id → place_google_sources.id → place_google_photos.google_source_id
+
+---
+
+## BREAKING CHANGES
+
+### For camperplaner-worker:
+1. `base` key shape changes: 30+ columns → 6 columns
+2. `osm` key renamed to `osm_properties` with different column set
+3. `llm` key renamed to `llm_properties` with different column set
+4. `google` key renamed to `google_properties` with different column set
+5. New keys: `user_properties`, `google_reviews`, `google_photos`
+
+### For camperplaner-product:
+1. Any code reading `bundle.base.name` will get NULL (name removed from places)
+2. Any code reading `bundle.osm.tags` will get NULL (tags not in property table)
+3. Any code reading `bundle.llm.token_input` will get NULL (processing metadata not in property table)
+4. Must update to read from property tables instead
+
+### Migration Path for Consumers:
+1. Update code to read new key names (osm_properties, google_properties, llm_properties)
+2. Update code to read property columns instead of source columns
+3. Implement resolution priority if needed (user → OSM → Google → LLM)
+4. Handle new keys (user_properties, google_reviews, google_photos)
+
+---
+
+## VERIFICATION CHECKLIST
+
+- [x] New contract uses property tables (not source tables)
+- [x] places base is minimal (6 columns only)
+- [x] Resolution priority documented (user → OSM → Google → LLM)
+- [x] Legacy tables replaced where property tables exist
+- [x] 1:n child tables retained as separate keys (reviews, photos)
+- [x] user_aggregates unchanged
+- [x] Breaking changes documented
+- [x] Consumer migration path documented
+- [x] Join path for reviews/photos verified via google_source_id
+
+---
+
+Evidence: This file documents the new RPC contract.
+Source files:
+- supabase/migrations/20260318_fix_get_place_source_bundle_signature.sql (old RPC)
+- supabase/migrations/20260317210002_source_bundle_rpc.sql (original intent)
+- supabase/migrations/20260318200000_add_property_tables.sql (new property tables)
+- .sisyphus/evidence/task-1-dependency-audit.txt (dependency inventory)

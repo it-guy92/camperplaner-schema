@@ -1,0 +1,81 @@
+# F4: Expand-Contract Pattern Verification
+# Generated: 2026-03-18
+# Purpose: Confirm expand-contract pattern is followed (additive before destructive)
+
+================================================================================
+VERIFICATION RESULT: PASS
+================================================================================
+
+Expand-contract pattern is correctly followed.
+
+================================================================================
+EXPAND-CONTRACT PATTERN DEFINITION
+================================================================================
+
+Phase 1 (EXPAND): Add new tables/columns without breaking existing functionality
+Phase 2 (MIGRATE): Consumers migrate to new schema
+Phase 3 (CONTRACT): Remove deprecated tables/columns after validation
+
+================================================================================
+MIGRATION ANALYSIS
+================================================================================
+
+Current migration: 20260318200000_add_property_tables.sql
+Timestamp: 2026-03-18 20:00:00
+
+Operations in migration:
+- CREATE TABLE IF NOT EXISTS (x4) ✅ ADDITIVE
+- CREATE INDEX IF NOT EXISTS (x16) ✅ ADDITIVE
+- CREATE TRIGGER (x4) ✅ ADDITIVE
+- ALTER TABLE ENABLE ROW LEVEL SECURITY (x4) ✅ ADDITIVE
+- CREATE POLICY (x4) ✅ ADDITIVE
+- DROP TRIGGER IF EXISTS (x4) ✅ IDEMPOTENT (safe)
+
+Destructive operations:
+- DROP TABLE: NONE ✅
+- ALTER TABLE DROP: NONE ✅
+- TRUNCATE: NONE ✅
+
+================================================================================
+DROP SEQUENCE ANALYSIS (task-16-drop-sequence.txt)
+================================================================================
+
+Drop sequence is DOCUMENTED but NOT EXECUTED in this migration.
+
+Drop waves (future execution):
+- Wave 1: Leaf children (place_llm_evidence_markers, place_evidence_markers, place_evidence_sources)
+- Wave 2: Leaf children with mapped data (place_google_amenities, place_google_types, place_llm_facts, place_llm_sources)
+- Wave 3: Deprecated parent (place_source_evidence_runs)
+- Wave 4: Post-drop cleanup (types, docs)
+
+Verification gates before drop execution:
+- [ ] Backfill verified
+- [ ] Read cutover verified
+- [ ] Rollback checkpoint passed
+- [ ] Archive complete
+- [ ] Consumer repos synced
+- [ ] 24-hour observation window
+
+================================================================================
+MIGRATION TIMELINE
+================================================================================
+
+2026-03-18 10:32 - 20260318_fix_get_place_source_bundle_signature.sql
+2026-03-18 16:09 - 20260318130000_fix_get_place_source_bundle_ambiguous.sql
+2026-03-18 20:00 - 20260318200000_add_property_tables.sql (CURRENT)
+
+No drop migrations exist after the additive migration.
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✅ Phase 1 (EXPAND): Complete - 4 property tables created
+✅ Phase 2 (MIGRATE): Pending - consumers need to sync
+✅ Phase 3 (CONTRACT): Pending - drop sequence documented, not executed
+
+✅ Additive operations only in current migration
+✅ No destructive operations in current migration
+✅ Drop sequence respects FK dependencies (children before parents)
+✅ Drop sequence has verification gates before execution
+✅ Expand-contract pattern correctly followed

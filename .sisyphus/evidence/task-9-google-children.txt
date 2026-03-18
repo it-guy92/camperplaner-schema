@@ -1,0 +1,204 @@
+# Task 9: Google Child Tables - Retention & Preservation Analysis
+# Generated: 2026-03-18
+# Purpose: Document which Google child tables are preserved vs flattened, and why
+
+================================================================================
+SECTION 1: CHILD TABLE CLASSIFICATION
+================================================================================
+
+Google source family has 4 child tables under place_google_sources:
+
+| Table                    | Status     | Action         | Rationale                                    |
+|--------------------------|------------|----------------|----------------------------------------------|
+| place_google_reviews     | RETAINED   | No backfill    | 1:n relationship; reviews are individual items |
+| place_google_photos      | RETAINED   | No backfill    | 1:n relationship; photos are individual items |
+| place_google_types       | FLATTENED  | → source_categories, source_place_type | Aggregated into text[] and text columns |
+| place_google_amenities   | FLATTENED  | → boolean columns | Pivoted into typed boolean columns |
+
+================================================================================
+SECTION 2: RETAINED CHILD TABLES (1:n preserved)
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1 place_google_reviews - RETAINED AS-IS
+--------------------------------------------------------------------------------
+
+Why retained:
+- Each review is a distinct entity with author, rating, text, timestamp
+- Flattening would lose individual review data (author names, review text, dates)
+- Applications need to display individual reviews, not just aggregates
+- Review count is already captured in place_google_properties.review_count
+
+Schema (unchanged):
+  id                  bigserial PK
+  google_source_id    bigint FK → place_google_sources.id
+  author_name         text
+  rating              integer (1-5)
+  language_code       text
+  review_text         text
+  review_time         timestamptz
+  relative_time_description text
+  google_review_id    text
+  created_at          timestamptz
+
+Relationship to new property table:
+  place_google_properties.google_source_id → place_google_sources.id → place_google_reviews.google_source_id
+  
+  Query pattern:
+    SELECT r.* FROM place_google_reviews r
+    JOIN place_google_sources src ON src.id = r.google_source_id
+    JOIN place_google_properties gp ON gp.google_source_id = src.id
+    WHERE gp.place_id = $1 AND gp.is_current = true;
+
+Backfill impact: NONE. Reviews remain linked via google_source_id FK.
+The backfill copies google_source_id into place_google_properties, preserving the join path.
+
+--------------------------------------------------------------------------------
+2.2 place_google_photos - RETAINED AS-IS
+--------------------------------------------------------------------------------
+
+Why retained:
+- Each photo is a distinct entity with reference token, dimensions, attribution
+- Flattening would lose photo metadata needed for rendering
+- Photo references are tokens that require separate API calls to resolve URLs
+- Applications need to iterate individual photos for gallery display
+
+Schema (unchanged):
+  id                  bigserial PK
+  google_source_id    bigint FK → place_google_sources.id
+  photo_reference     text NOT NULL
+  width               integer
+  height              integer
+  attribution         text
+  google_photo_id     text
+  created_at          timestamptz
+
+Relationship to new property table:
+  place_google_properties.google_source_id → place_google_sources.id → place_google_photos.google_source_id
+  
+  Query pattern:
+    SELECT p.* FROM place_google_photos p
+    JOIN place_google_sources src ON src.id = p.google_source_id
+    JOIN place_google_properties gp ON gp.google_source_id = src.id
+    WHERE gp.place_id = $1 AND gp.is_current = true;
+
+Backfill impact: NONE. Photos remain linked via google_source_id FK.
+
+================================================================================
+SECTION 3: FLATTENED CHILD TABLES (data absorbed into property row)
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1 place_google_types → source_place_type + source_categories
+--------------------------------------------------------------------------------
+
+Why flattened:
+- Types are a small, finite set per place (typically 1-5 values)
+- No individual item semantics (unlike reviews/photos)
+- Natural fit for text[] array column
+- Primary type is a single value → text column
+
+Flattening logic:
+  source_place_type = google_type WHERE is_primary = true (LIMIT 1)
+  source_categories = array_agg(google_type) (all types)
+
+Data loss assessment: NONE
+- All google_type values preserved in source_categories array
+- Primary type preserved in source_place_type
+- is_primary flag is implicit (first element or derivable)
+
+Post-backfill: place_google_types table is retained for now but becomes
+a read-through cache. New writes should go directly to source_categories.
+
+--------------------------------------------------------------------------------
+3.2 place_google_amenities → boolean columns
+--------------------------------------------------------------------------------
+
+Why flattened:
+- Amenities are boolean flags (present/absent)
+- Each amenity_key maps to exactly one boolean column
+- No multi-value semantics per amenity
+- Aligns with Amenity Facts Pattern (typed columns, not JSONB)
+
+Flattening logic:
+  Each amenity_key → MAX(CASE WHEN amenity_key = X THEN value_boolean END)
+  
+  17 amenity keys mapped to 16 target columns:
+  - laundry + washing_machine → has_laundry (COALESCE)
+  - All others: 1:1 mapping
+
+Data loss assessment: PARTIAL (acceptable)
+- value_text, value_numeric: Discarded (amenities are boolean in target schema)
+- google_feature_type: Discarded (provenance detail)
+- is_verified: Discarded (verification status not carried forward)
+- confidence_score: Discarded (per-amenity confidence not in target schema)
+- source_section: Discarded (provenance detail)
+
+Rationale for discarding:
+- Target schema uses boolean columns per Amenity Facts Pattern
+- Per-amenity confidence is replaced by overall data_confidence
+- Provenance details are process data, not place properties
+- Verified status is implicit (Google is a trusted source)
+
+Post-backfill: place_google_amenities table is retained for now but becomes
+a read-through cache. New writes should go directly to boolean columns.
+
+================================================================================
+SECTION 4: JOIN PATH PRESERVATION
+================================================================================
+
+The backfill preserves the join path from property table to child tables:
+
+  places.id
+    ↓ (place_id)
+  place_google_properties
+    ↓ (google_source_id)
+  place_google_sources
+    ├→ place_google_reviews (google_source_id)
+    ├→ place_google_photos (google_source_id)
+    ├→ place_google_types (google_source_id) [flattened but retained]
+    └→ place_google_amenities (google_source_id) [flattened but retained]
+
+This means:
+1. Reviews and photos remain queryable via the same FK chain
+2. Types and amenities are available in both flattened (property) and normalized (child) form
+3. Applications can choose which representation to query based on use case
+
+================================================================================
+SECTION 5: VERIFICATION
+================================================================================
+
+-- Verify reviews are still linked
+SELECT COUNT(*) AS review_count
+FROM place_google_reviews r
+JOIN place_google_sources src ON src.id = r.google_source_id
+WHERE src.is_current = true
+  AND src.place_id IN (SELECT place_id FROM place_google_properties WHERE is_current = true);
+
+-- Verify photos are still linked
+SELECT COUNT(*) AS photo_count
+FROM place_google_photos p
+JOIN place_google_sources src ON src.id = p.google_source_id
+WHERE src.is_current = true
+  AND src.place_id IN (SELECT place_id FROM place_google_properties WHERE is_current = true);
+
+-- Verify types are flattened correctly
+SELECT
+  gp.place_id,
+  gp.source_place_type,
+  gp.source_categories,
+  (SELECT COUNT(*) FROM place_google_types t WHERE t.google_source_id = gp.google_source_id) AS type_count
+FROM place_google_properties gp
+WHERE gp.is_current = true
+LIMIT 10;
+
+-- Verify amenities are flattened correctly
+SELECT
+  gp.place_id,
+  gp.has_electricity,
+  gp.has_wifi,
+  gp.has_shower,
+  (SELECT COUNT(*) FROM place_google_amenities a WHERE a.google_source_id = gp.google_source_id) AS amenity_count
+FROM place_google_properties gp
+WHERE gp.is_current = true
+LIMIT 10;

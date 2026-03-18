@@ -1,0 +1,46 @@
+# F4: Google Child Tables Preservation Verification
+# Generated: 2026-03-18
+# Purpose: Confirm place_google_reviews and place_google_photos are preserved
+
+================================================================================
+VERIFICATION RESULT: PASS
+================================================================================
+
+Google child tables (reviews, photos) are PRESERVED in the schema.
+
+================================================================================
+EVIDENCE
+================================================================================
+
+1. Migration Analysis (20260318200000_add_property_tables.sql):
+   - Migration creates 4 new property tables only
+   - No DROP TABLE statements for place_google_reviews or place_google_photos
+   - No ALTER TABLE statements affecting these tables
+   - Tables remain untouched by the additive migration
+
+2. Drop Sequence Analysis (task-16-drop-sequence.txt):
+   - place_google_reviews: Explicitly marked as RETAINED
+   - place_google_photos: Explicitly marked as RETAINED
+   - place_google_types: Marked as DEPRECATED (flattened)
+   - place_google_amenities: Marked as DEPRECATED (flattened)
+
+3. Retention Rationale (task-9-google-children.txt):
+   - place_google_reviews: 1:n relationship; individual reviews needed for display
+   - place_google_photos: 1:n relationship; individual photos needed for gallery
+   - Both tables maintain FK chain via google_source_id
+
+4. SQL Search Results:
+   - place_google_reviews: Referenced only in CREATE TABLE (20260316110002)
+   - place_google_photos: Referenced only in CREATE TABLE (20260316110002)
+   - No DROP TABLE statements found for either table in any migration
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✅ place_google_reviews: PRESERVED (RETAINED)
+✅ place_google_photos: PRESERVED (RETAINED)
+
+Both Google child tables are preserved and will remain in the schema after
+the property table migration. They maintain their existing FK relationships
+and can be queried via the google_source_id join path.

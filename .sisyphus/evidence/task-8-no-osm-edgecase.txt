@@ -1,0 +1,253 @@
+# Task 8: No-OSM-Source Edge Case — Fallback Strategy
+# Generated: 2026-03-18
+# Purpose: Explicit handling for places without current osm_source rows
+
+================================================================================
+SECTION 1: EDGE CASE DEFINITION
+================================================================================
+
+A "no-OSM-source" place is a row in `places` that has NO matching row in
+`osm_source` WHERE `is_current = true`.
+
+This can happen when:
+1. Place was imported from a non-OSM source (e.g., manual entry, Google-only)
+2. OSM source row exists but is_current = false (historical/stale)
+3. OSM source row was deleted during cleanup
+4. Place was created before OSM import pipeline existed
+
+================================================================================
+SECTION 2: FALLBACK STRATEGY
+================================================================================
+
+**Strategy: Create place_osm_properties row with places-only data, OSM columns NULL**
+
+Rationale:
+- Every place MUST have a place_osm_properties row for cross-source resolution
+- NULL OSM columns = "OSM has no claim on this place" (valid per spec)
+- places business columns still provide useful data (name, address, amenities)
+- No data loss: all places business data preserved in shared columns
+
+Behavior:
+| Column Group          | Value Source          | NULL?                     |
+|-----------------------|-----------------------|---------------------------|
+| place_id              | places.id             | Never NULL                |
+| is_current            | true                  | Never NULL                |
+| Shared business cols  | places.*              | NULL if places has NULL   |
+| OSM-specific cols     | —                     | Always NULL               |
+| source_updated_at     | —                     | Always NULL               |
+
+================================================================================
+SECTION 3: WHAT IS PRESERVED (places-only data)
+================================================================================
+
+Even without OSM source, these columns are populated from places:
+
+Identity:
+- name (places.name)
+- place_type (places.place_type)
+- source_place_type (places.place_type)
+
+Address:
+- country_code, region, city, postcode, address
+- source_lat, source_lon
+
+Contact:
+- website, phone, email, opening_hours, fee_info
+
+Amenities (from places boolean columns):
+- pets_allowed ← places.pet_friendly
+- has_restrooms ← places.has_toilet
+- has_drinking_water ← places.has_water
+- has_wifi ← places.has_wifi
+- caravan_allowed ← places.caravan_allowed
+- motorhome_allowed ← places.motorhome_allowed
+- tent_allowed ← places.tent_allowed
+- has_electricity ← places.has_electricity
+- has_fresh_water ← places.has_water
+- has_shower ← places.has_shower
+
+================================================================================
+SECTION 4: WHAT IS NULL (no OSM source)
+================================================================================
+
+These columns are NULL when no OSM source exists:
+
+OSM-specific:
+- osm_source_id = NULL
+- osm_id = NULL
+- osm_type = NULL
+- osm_version = NULL
+- osm_timestamp = NULL
+
+Metadata:
+- source_updated_at = NULL (no OSM last_seen_at)
+
+New schema fields (not in places):
+- description = NULL
+- source_categories = NULL
+- wheelchair_accessible = NULL
+- family_friendly = NULL
+- indoor = NULL
+- outdoor = NULL
+- entry_fee_required = NULL
+- reservation_required = NULL
+- overnight_stay_allowed = NULL
+- has_parking = NULL
+- has_shop = NULL
+- has_restaurant = NULL
+- has_cafe = NULL
+- has_laundry = NULL
+- has_dishwashing_area = NULL
+- has_grey_water_disposal = NULL
+- has_black_water_disposal = NULL
+- has_chemical_toilet_disposal = NULL
+- has_dump_station = NULL
+- has_waste_disposal = NULL
+- has_recycling = NULL
+- has_bbq_area = NULL
+- has_fire_pit = NULL
+- has_playground = NULL
+- has_pool = NULL
+- has_beach = NULL
+- nudism_allowed = NULL
+- nudism_only = NULL
+- has_guided_tours = NULL
+- has_audio_guide = NULL
+- has_visitor_center = NULL
+- has_lockers = NULL
+- photography_allowed = NULL
+
+================================================================================
+SECTION 5: READ-RESOLUTION IMPACT
+================================================================================
+
+When resolving properties for a place without OSM source:
+
+Priority: User → OSM → Google → LLM
+
+1. User properties: checked first (may override)
+2. OSM properties: row exists but OSM-specific cols are NULL
+   - Shared columns (name, address, amenities) ARE populated from places
+   - Resolution treats this as "OSM has business data but no OSM metadata"
+3. Google properties: checked next (may supplement)
+4. LLM properties: checked last (may supplement)
+
+Key insight: The place_osm_properties row for no-OSM-source places still provides
+value because it contains the places business data. The NULL OSM-specific columns
+simply mean "no OSM tracking data available."
+
+================================================================================
+SECTION 6: DETECTION QUERY
+================================================================================
+
+Find all places without current OSM source:
+
+```sql
+SELECT p.id, p.name, p.place_type, p.country_code
+FROM places p
+LEFT JOIN osm_source os ON os.place_id = p.id AND os.is_current = true
+WHERE os.id IS NULL
+ORDER BY p.id;
+```
+
+Count by reason:
+```sql
+SELECT 
+    CASE 
+        WHEN NOT EXISTS (SELECT 1 FROM osm_source WHERE place_id = p.id) 
+            THEN 'never_imported'
+        WHEN EXISTS (SELECT 1 FROM osm_source WHERE place_id = p.id AND is_current = false) 
+            THEN 'stale_only'
+        ELSE 'deleted'
+    END AS reason,
+    COUNT(*) AS place_count
+FROM places p
+WHERE NOT EXISTS (
+    SELECT 1 FROM osm_source WHERE place_id = p.id AND is_current = true
+)
+GROUP BY 1;
+```
+
+================================================================================
+SECTION 7: CONSTRAINT COMPATIBILITY
+================================================================================
+
+The partial unique index allows this pattern:
+```sql
+CREATE UNIQUE INDEX uidx_osm_properties_place_current
+    ON place_osm_properties(place_id)
+    WHERE is_current = true;
+```
+
+- Each place_id can have exactly ONE row with is_current = true
+- This row MAY have NULL osm_source_id (no constraint violation)
+- FK constraint only applies to place_id → places.id (always satisfied)
+
+No constraint violations from no-OSM-source backfill.
+
+================================================================================
+SECTION 8: FUTURE ENRICHMENT PATH
+================================================================================
+
+When OSM import pipeline processes these places later:
+1. New osm_source row created with is_current = true
+2. place_osm_properties row updated (not inserted) with OSM-specific columns
+3. source_updated_at set to osm_source.last_seen_at
+4. No duplicate rows created (ON CONFLICT handles this)
+
+The backfill creates the "shell" — OSM import fills in the OSM-specific data.
+
+================================================================================
+SECTION 9: ANTI-PATTERNS AVOIDED
+================================================================================
+
+❌ WRONG: Convert missing OSM to has_* = false
+   - Violates NULL = "no claim" semantics
+   - Creates false negatives (place "has no toilet" when OSM simply didn't check)
+
+❌ WRONG: Skip place_osm_properties row for no-OSM-source places
+   - Breaks cross-source resolution (missing row = broken JOIN)
+   - Loses places business data that IS available
+
+❌ WRONG: Use places.source_primary to decide row creation
+   - source_primary is being discarded (replaced by source-family model)
+   - All places need place_osm_properties row regardless of source_primary
+
+✅ CORRECT: Create row with places data, OSM columns NULL
+   - Preserves all available data
+   - Maintains NULL = "no claim" semantics
+   - Enables future OSM enrichment without schema changes
+
+================================================================================
+SECTION 10: VERIFICATION
+================================================================================
+
+After backfill, verify no-OSM-source places are handled correctly:
+
+```sql
+-- Count no-OSM-source places that HAVE place_osm_properties rows
+SELECT COUNT(*) AS backfilled_no_osm
+FROM place_osm_properties pop
+WHERE pop.is_current = true
+  AND pop.osm_source_id IS NULL
+  AND pop.place_id IN (
+      SELECT p.id FROM places p
+      LEFT JOIN osm_source os ON os.place_id = p.id AND os.is_current = true
+      WHERE os.id IS NULL
+  );
+
+-- Verify these rows still have places business data
+SELECT 
+    pop.place_id,
+    pop.name IS NOT NULL AS has_name,
+    pop.place_type IS NOT NULL AS has_type,
+    pop.country_code IS NOT NULL AS has_country,
+    pop.osm_source_id IS NULL AS osm_null
+FROM place_osm_properties pop
+WHERE pop.is_current = true
+  AND pop.osm_source_id IS NULL
+LIMIT 10;
+```
+
+VERIFICATION: No-OSM-source edge case has explicit fallback strategy.
+Every place gets a place_osm_properties row. NULL OSM columns = valid "no claim."

@@ -1,0 +1,262 @@
+================================================================================
+TASK 11: CURRENT-ROW RULES FOR place_user_properties
+================================================================================
+Generated: 2026-03-18
+Plan: place-properties-migration
+Task: 11 - Define the user correction model for place_user_properties
+
+================================================================================
+SECTION 1: ONE-CURRENT-ROW-PER-(PLACE,USER) RULE
+================================================================================
+
+RULE: At any given time, there can be at most ONE row with is_current = true
+      for each unique (place_id, user_id) combination.
+
+This is enforced by a partial unique index:
+
+    CREATE UNIQUE INDEX uidx_user_properties_place_user_current
+        ON place_user_properties(place_id, user_id)
+        WHERE is_current = true;
+
+This index:
+- Allows multiple rows with is_current = false (historical corrections)
+- Allows at most one row with is_current = true per (place_id, user_id)
+- Is transparent to INSERT/UPDATE operations - DB enforces automatically
+
+================================================================================
+SECTION 2: SUBMITTING A NEW CORRECTION
+================================================================================
+
+When a user submits a NEW correction for a place they have already corrected:
+
+STEP 1: Update existing current row to non-current
+    UPDATE place_user_properties
+    SET is_current = false,
+        updated_at = now()
+    WHERE place_id = <target_place_id>
+      AND user_id = <submitting_user_id>
+      AND is_current = true;
+
+STEP 2: Insert the new correction as current
+    INSERT INTO place_user_properties (
+        place_id,
+        user_id,
+        is_current,
+        created_at,
+        updated_at,
+        source_updated_at,
+        <...all other property columns...>
+    ) VALUES (
+        <target_place_id>,
+        <submitting_user_id>,
+        true,
+        now(),
+        now(),
+        now(),  -- source_updated_at set to submission time
+        <user_provided_values>
+    );
+
+STEP 3: (Optional) Keep or delete the old row
+    - KEEP: Preserves correction history for audit/debugging
+    - DELETE: Saves storage if history not needed
+    - Decision depends on business requirements
+
+IMPORTANT: These operations should be in a transaction to ensure atomicity
+and prevent race conditions between concurrent submissions.
+
+================================================================================
+SECTION 3: SUBMITTING FIRST CORRECTION FOR A PLACE
+================================================================================
+
+When a user submits their FIRST correction for a place (no previous corrections):
+
+INSERT directly with is_current = true:
+
+    INSERT INTO place_user_properties (
+        place_id,
+        user_id,
+        is_current,
+        created_at,
+        updated_at,
+        source_updated_at,
+        <...other columns...>
+    ) VALUES (
+        <target_place_id>,
+        <submitting_user_id>,
+        true,
+        now(),
+        now(),
+        now(),
+        <user_provided_values>
+    );
+
+The partial unique index will allow this since no current row exists yet.
+
+================================================================================
+SECTION 4: QUERYING USER CORRECTIONS
+================================================================================
+
+Get user's current correction for a place:
+
+    SELECT *
+    FROM place_user_properties
+    WHERE place_id = <target_place_id>
+      AND user_id = <user_id>
+      AND is_current = true;
+
+Get user's all corrections for a place (including history):
+
+    SELECT *
+    FROM place_user_properties
+    WHERE place_id = <target_place_id>
+      AND user_id = <user_id>
+    ORDER BY created_at DESC;
+
+Get all current user corrections for a place (from ALL users):
+
+    SELECT *
+    FROM place_user_properties
+    WHERE place_id = <target_place_id>
+      AND is_current = true;
+
+================================================================================
+SECTION 5: DOWNSTREAM READ RESOLUTION
+================================================================================
+
+User corrections participate in the READ RESOLUTION PRIORITY chain:
+
+    1. USER     (place_user_properties where is_current = true)
+    2. OSM      (place_osm_properties where is_current = true)
+    3. GOOGLE   (place_google_properties where is_current = true)
+    4. LLM      (place_llm_properties where is_current = true)
+
+For a given field (e.g., has_wifi):
+
+    1. Check if USER has a value (not NULL)
+       - If YES: use USER value (TRUE/FALSE/NULL)
+       - If NULL (user didn't provide): continue to next source
+
+    2. Check if OSM has a value (not NULL)
+       - If YES: use OSM value
+       - If NULL: continue to next source
+
+    3. Check if GOOGLE has a value (not NULL)
+       - If YES: use GOOGLE value
+       - If NULL: continue to next source
+
+    4. Check if LLM has a value (not NULL)
+       - If YES: use LLM value
+       - If NULL: return NULL (unknown)
+
+This priority is applied per-field, not per-row. A user correction might
+provide has_wifi but NOT has_shower; for has_shower, the resolver would
+fall back to OSM/Google/LLM.
+
+================================================================================
+SECTION 6: WHY USER CORRECTIONS DON'T BLOAT places
+================================================================================
+
+The property tables (including place_user_properties) are DESIGNED to NOT
+push resolved values back into the places table. This is intentional:
+
+1. AUDIT TRAIL: User corrections are stored separately, preserving:
+   - What the user claimed
+   - When they submitted it
+   - Their history of corrections
+
+2. SOURCE PROVENANCE: Downstream consumers can see:
+   - Which source provided which value
+   - Make trust decisions based on source
+
+3. EASY ROLLBACK: If a user realizes their correction was wrong:
+   - Simply set is_current = false on their latest row
+   - Their previous correction (if any) becomes current again
+
+4. MULTI-USER SCENARIOS: Multiple users can submit different corrections:
+   - Each user's correction is stored separately
+   - Read resolution can either:
+     a) Take highest priority (user > OSM > Google > LLM)
+     b) Take specific user's correction (if viewing own data)
+
+5. NO DATA DUPLICATION: The places table remains the canonical entity table,
+   not a flattened view of all sources. Property tables are appendage tables.
+
+================================================================================
+SECTION 7: RESOLUTION ROLE FOR USER CORRECTIONS
+================================================================================
+
+The role of user corrections in read resolution:
+
+- HIGHEST PRIORITY: User corrections override all other sources
+- This is intentional because:
+  a) Humans provide more reliable ground-truth than automated sources
+  b) Users have visited the place and can verify amenities
+  c) Community input corrects OSM/Google/LLM errors
+
+- NULL handling: If user leaves a field blank (NULL), resolution falls through
+  to the next source. User corrections don't "block" data from other sources.
+
+- Partial corrections supported: A user might correct has_wifi but leave
+  has_shower blank. Resolution handles this gracefully.
+
+================================================================================
+SECTION 8: ROLLBACK PROCEDURE
+================================================================================
+
+To rollback a user correction (e.g., user made a mistake):
+
+    -- If user has previous correction, restore it
+    UPDATE place_user_properties
+    SET is_current = true,
+        updated_at = now()
+    WHERE place_id = <place_id>
+      AND user_id = <user_id>
+      AND id = (
+          SELECT id
+          FROM place_user_properties
+          WHERE place_id = <place_id>
+            AND user_id = <user_id>
+            AND is_current = false
+          ORDER BY created_at DESC
+          LIMIT 1
+      );
+
+    -- Mark current as non-current
+    UPDATE place_user_properties
+    SET is_current = false,
+        updated_at = now()
+    WHERE place_id = <place_id>
+      AND user_id = <user_id>
+      AND is_current = true;
+
+Or simply delete the incorrect correction:
+
+    DELETE FROM place_user_properties
+    WHERE place_id = <place_id>
+      AND user_id = <user_id>
+      AND is_current = true
+      AND id = <incorrect_row_id>;
+
+================================================================================
+SECTION 9: CONSTRAINT VERIFICATION
+================================================================================
+
+To verify current-row constraints are working:
+
+    -- Should return 0 rows if constraints are working
+    SELECT place_id, user_id, COUNT(*) as current_count
+    FROM place_user_properties
+    WHERE is_current = true
+    GROUP BY place_id, user_id
+    HAVING COUNT(*) > 1;
+
+To check for orphaned user corrections (user_id doesn't exist):
+
+    SELECT pup.*
+    FROM place_user_properties pup
+    LEFT JOIN profiles p ON pup.user_id = p.id
+    WHERE p.id IS NULL;
+
+================================================================================
+END OF CURRENT-ROW RULES
+================================================================================

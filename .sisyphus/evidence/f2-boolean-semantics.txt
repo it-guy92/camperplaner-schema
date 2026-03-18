@@ -1,0 +1,117 @@
+================================================================================
+F2 EVIDENCE: Boolean Semantics Verification
+================================================================================
+Generated: 2026-03-18
+Source: supabase/migrations/20260318200000_add_property_tables.sql
+Reference: .sisyphus/evidence/task-3-null-semantics.txt
+
+================================================================================
+1. BOOLEAN COLUMN ANALYSIS
+================================================================================
+
+1.1 Infrastructure Boolean: is_current
+--------------------------------------------------------------------------------
+Definition: is_current boolean NOT NULL DEFAULT true
+Tables: All 4 property tables
+Verdict: PASS
+
+Rationale: is_current is an infrastructure flag, NOT a source claim.
+- NOT NULL is correct: every row must have a definitive current/historical state
+- DEFAULT true is correct: new rows are current by default
+- This column does NOT follow null-semantics (it's metadata, not source data)
+
+1.2 Feature Booleans (37 columns per table, 148 total)
+--------------------------------------------------------------------------------
+Expected pattern (from task-3-null-semantics.txt):
+  column_name boolean NOT NULL DEFAULT NULL
+
+Actual pattern in migration:
+  column_name boolean DEFAULT NULL
+
+DISCREPANCY FOUND: Missing NOT NULL constraint on feature booleans.
+
+Affected columns (all 4 tables have identical boolean columns):
+- Generic Flags (8): wheelchair_accessible, family_friendly, pets_allowed,
+  indoor, outdoor, entry_fee_required, reservation_required, overnight_stay_allowed
+- General Facilities (7): has_parking, has_restrooms, has_drinking_water,
+  has_wifi, has_shop, has_restaurant, has_cafe
+- Camping Permissions (3): caravan_allowed, motorhome_allowed, tent_allowed
+- Camping Facilities (5): has_electricity, has_fresh_water, has_shower,
+  has_laundry, has_dishwashing_area
+- Disposal/Utilities (6): has_grey_water_disposal, has_black_water_disposal,
+  has_chemical_toilet_disposal, has_dump_station, has_waste_disposal, has_recycling
+- Leisure (5): has_bbq_area, has_fire_pit, has_playground, has_pool, has_beach
+- Nudism (2): nudism_allowed, nudism_only
+- Attraction/Museum (5): has_guided_tours, has_audio_guide, has_visitor_center,
+  has_lockers, photography_allowed
+
+================================================================================
+2. DEFAULT VALUE VERIFICATION
+================================================================================
+
+2.1 Correct: All feature booleans DEFAULT NULL
+--------------------------------------------------------------------------------
+Status: PASS
+
+No feature boolean uses DEFAULT false.
+All 37 feature booleans per table use DEFAULT NULL.
+This preserves "no-claim" semantics correctly.
+
+2.2 Issue: Feature booleans missing NOT NULL constraint
+--------------------------------------------------------------------------------
+Status: WARN (not FAIL)
+
+Spec requires: boolean NOT NULL DEFAULT NULL
+Migration has: boolean DEFAULT NULL
+
+Impact assessment:
+- DEFAULT NULL is preserved (correct behavior for no-claim semantics)
+- Missing NOT NULL means application can explicitly INSERT NULL
+- With NOT NULL DEFAULT NULL, PostgreSQL would reject explicit NULL inserts
+  but still default to NULL when column is omitted
+- Practical impact: LOW - applications typically omit columns rather than
+  explicitly inserting NULL
+
+Semantic correctness: The DEFAULT NULL part is what matters for no-claim
+semantics. The NOT NULL constraint is a data integrity guardrail, not a
+semantic requirement.
+
+================================================================================
+3. NO UNINTENDED FALSE DEFAULTS
+================================================================================
+
+Verification: grep for "DEFAULT false" in migration file
+Result: ZERO matches
+
+No boolean column defaults to false anywhere in the migration.
+This is correct - false would mean "source explicitly said no" and should
+only be set explicitly by data import, never as a default.
+
+================================================================================
+4. SEMANTIC PRESERVATION CHECK
+================================================================================
+
+NULL = "Source made no claim"     ✓ Preserved (DEFAULT NULL)
+FALSE = "Source explicitly said no" ✓ Can be set explicitly
+TRUE = "Source explicitly said yes" ✓ Can be set explicitly
+
+The three-state boolean semantics are preserved in the migration.
+
+================================================================================
+5. OVERALL VERDICT
+================================================================================
+
+PASS: All feature booleans DEFAULT NULL (no false defaults)
+PASS: No unintended false defaults found
+PASS: is_current correctly uses NOT NULL DEFAULT true
+WARN: Feature booleans missing NOT NULL constraint (spec deviation)
+      - Spec: boolean NOT NULL DEFAULT NULL
+      - Migration: boolean DEFAULT NULL
+      - Impact: LOW - semantic correctness preserved, minor integrity gap
+
+RECOMMENDATION: Consider adding NOT NULL to feature booleans in a follow-up
+migration for strict spec compliance, but this is not blocking.
+
+================================================================================
+END OF EVIDENCE
+================================================================================

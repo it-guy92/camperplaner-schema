@@ -1,0 +1,319 @@
+# Task 13: campsite_full View Cutover Design
+# Generated: 2026-03-18
+# Purpose: Redesign campsite_full to resolve from property tables instead of places
+
+================================================================================
+SECTION 1: CURRENT VIEW ANALYSIS
+================================================================================
+
+Current view file: supabase/migrations/20260314221355_fix_campsite_full_required_fields_and_amenities.sql
+
+Current dependencies:
+- places (21 column references - ALL deprecated)
+- campsites_cache (Google/scraped/description data)
+- campsite_reviews (aggregated review_count, avg_rating)
+- campsite_prices (aggregated price_count)
+- favorites (aggregated favorite_count)
+
+Problem: places table will be reduced to (id, lat, lon, is_active, created_at, updated_at).
+All 21 business column references will BREAK.
+
+================================================================================
+SECTION 2: NEW VIEW DESIGN
+================================================================================
+
+2.1 SOURCE TABLES (unchanged joins)
+-----------------------------------
+- places: Only for id, lat, lon, created_at, updated_at
+- campsites_cache: Retained for Google/scraped/description/price data
+- campsite_reviews: Retained for review aggregation
+- campsite_prices: Retained for price aggregation
+- favorites: Retained for favorite aggregation
+
+2.2 NEW SOURCE TABLES (property resolution)
+-------------------------------------------
+- place_user_properties (is_current = true): HIGHEST priority
+- place_osm_properties (is_current = true): Second priority
+- place_google_properties (is_current = true): Third priority
+- place_llm_properties (is_current = true): Lowest priority
+
+2.3 RESOLUTION PRIORITY
+-----------------------
+User → OSM → Google → LLM
+
+For each business field, COALESCE across sources in priority order:
+  COALESCE(user.field, osm.field, google.field, llm.field)
+
+NULL semantics preserved: if ALL sources are NULL, output is NULL (no silent defaults).
+
+================================================================================
+SECTION 3: COLUMN-BY-COLUMN MAPPING
+================================================================================
+
+3.1 IDENTITY / LOCATION FIELDS
+-------------------------------
+
+| View Column  | Old Source      | New Resolution (COALESCE chain)                    |
+|--------------|-----------------|----------------------------------------------------|
+| place_id     | p.id::text      | p.id::text (unchanged - from places)               |
+| name         | p.name          | COALESCE(up.name, op.name, gp.name, lp.name)       |
+| location     | p.city/region/address | COALESCE(up.city||...', op.city||...', ...)  |
+| lat          | p.lat           | p.lat (unchanged - from places)                    |
+| lng          | p.lon           | p.lon (unchanged - from places)                    |
+
+3.2 SOURCE / TYPE FIELDS
+------------------------
+
+| View Column    | Old Source           | New Resolution                                    |
+|----------------|----------------------|---------------------------------------------------|
+| source_type    | p.source_primary     | COALESCE(up.source_place_type, op.source_place_type, ...) |
+| osm_id         | NULL::text           | op.osm_id::text (from OSM properties only)        |
+| osm_tags       | p.source_primary etc | jsonb_build_object from op columns                |
+| type           | p.place_type         | Derived from resolved place_type                   |
+
+3.3 CONTACT / OPERATIONS FIELDS
+-------------------------------
+
+| View Column      | Old Source      | New Resolution                                    |
+|------------------|-----------------|---------------------------------------------------|
+| website          | p.website       | COALESCE(up.website, op.website, gp.website, lp.website) |
+| opening_hours    | p.opening_hours | COALESCE(up.opening_hours, op.opening_hours, gp.opening_hours, lp.opening_hours) |
+| contact_phone    | p.phone         | COALESCE(up.phone, op.phone, gp.phone, lp.phone)  |
+| contact_email    | p.email         | COALESCE(up.email, op.email, gp.email, lp.email)  |
+
+3.4 AMENITY FIELDS (column name renames required)
+-------------------------------------------------
+
+| View Column        | Old Source       | New Resolution (property table column)             |
+|--------------------|------------------|----------------------------------------------------|
+| has_toilet         | p.has_toilet     | COALESCE(up.has_restrooms, op.has_restrooms, gp.has_restrooms, lp.has_restrooms) |
+| has_shower         | p.has_shower     | COALESCE(up.has_shower, op.has_shower, gp.has_shower, lp.has_shower) |
+| has_electricity    | p.has_electricity| COALESCE(up.has_electricity, op.has_electricity, gp.has_electricity, lp.has_electricity) |
+| has_dogs_allowed   | p.pet_friendly   | COALESCE(up.pets_allowed, op.pets_allowed, gp.pets_allowed, lp.pets_allowed) |
+| has_wifi           | p.has_wifi       | COALESCE(up.has_wifi, op.has_wifi, gp.has_wifi, lp.has_wifi) |
+| has_water          | p.has_water      | COALESCE(up.has_drinking_water, op.has_drinking_water, gp.has_drinking_water, lp.has_drinking_water) |
+| has_beach          | false (hardcoded)| COALESCE(up.has_beach, op.has_beach, gp.has_beach, lp.has_beach) |
+| has_laundry        | false (hardcoded)| COALESCE(up.has_laundry, op.has_laundry, gp.has_laundry, lp.has_laundry) |
+| has_restaurant     | false (hardcoded)| COALESCE(up.has_restaurant, op.has_restaurant, gp.has_restaurant, lp.has_restaurant) |
+| has_bar            | false (hardcoded)| COALESCE(up.has_cafe, op.has_cafe, gp.has_cafe, lp.has_cafe) |
+| has_shop           | false (hardcoded)| COALESCE(up.has_shop, op.has_shop, gp.has_shop, lp.has_shop) |
+| has_pool           | false (hardcoded)| COALESCE(up.has_pool, op.has_pool, gp.has_pool, lp.has_pool) |
+| has_playground     | false (hardcoded)| COALESCE(up.has_playground, op.has_playground, gp.has_playground, lp.has_playground) |
+| has_dump_station   | false (hardcoded)| COALESCE(up.has_dump_station, op.has_dump_station, gp.has_dump_station, lp.has_dump_station) |
+| has_washing_machine| false (hardcoded)| COALESCE(up.has_laundry, op.has_laundry, gp.has_laundry, lp.has_laundry) |
+| has_dishwasher     | false (hardcoded)| COALESCE(up.has_dishwashing_area, op.has_dishwashing_area, gp.has_dishwashing_area, lp.has_dishwashing_area) |
+
+Note: has_bar maps to has_cafe in property tables (semantic match per D30).
+Note: has_washing_machine maps to has_laundry in property tables (per D29).
+
+3.5 UNCHANGED FIELDS (from campsites_cache, reviews, prices, favorites)
+-----------------------------------------------------------------------
+
+| View Column              | Source              | Notes                    |
+|--------------------------|---------------------|--------------------------|
+| scraped_website_url      | cc                  | No change                |
+| scraped_at               | cc                  | No change                |
+| scraped_price_info       | cc                  | No change                |
+| scraped_data_source      | cc                  | No change                |
+| description              | cc                  | No change                |
+| description_source       | cc                  | No change                |
+| description_generated_at | cc                  | No change                |
+| description_version      | cc                  | No change                |
+| estimated_price          | cc                  | No change                |
+| price_source             | cc                  | No change                |
+| user_price_count         | cc                  | No change                |
+| user_price_avg           | cc                  | No change                |
+| place_types              | cc / fallback       | Fallback uses resolved type |
+| created_at               | p                   | No change                |
+| updated_at               | p                   | No change                |
+| google_place_id          | cc.place_id         | No change                |
+| google_photos            | cc                  | No change                |
+| google_reviews           | cc                  | No change                |
+| google_data_fetched_at   | cc                  | No change                |
+| google_data_expires_at   | cc                  | No change                |
+| google_data_expired      | derived             | No change                |
+| review_count             | r (aggregated)      | No change                |
+| avg_rating               | r (aggregated)      | No change                |
+| user_price_entries       | cp (aggregated)     | No change                |
+| favorite_count           | f (aggregated)      | No change                |
+| google_rating            | cc.rating           | No change                |
+| rating                   | COALESCE(cc, r)     | No change                |
+
+================================================================================
+SECTION 4: COLUMN NAME MISMATCHES (property tables → view)
+================================================================================
+
+These columns have DIFFERENT names in property tables vs the view output:
+
+| Property Table Column | View Column        | Notes                              |
+|-----------------------|--------------------|------------------------------------|
+| has_restrooms         | has_toilet         | Semantic rename (restrooms → toilet)|
+| has_drinking_water    | has_water          | Semantic rename (drinking → water)  |
+| pets_allowed          | has_dogs_allowed   | Naming convention change            |
+| has_cafe              | has_bar            | Semantic match (cafe → bar)         |
+| has_dishwashing_area  | has_docker         | Semantic rename                     |
+
+All other boolean columns keep identical names.
+
+================================================================================
+SECTION 5: NEW VIEW SQL
+================================================================================
+
+```sql
+CREATE OR REPLACE VIEW campsite_full AS
+SELECT
+    -- Identity
+    p.id::text AS place_id,
+    COALESCE(up.name, op.name, gp.name, lp.name) AS name,
+    COALESCE(
+        NULLIF(TRIM(CONCAT_WS(', ',
+            COALESCE(up.city, op.city, gp.city, lp.city),
+            COALESCE(up.region, op.region, gp.region, lp.region),
+            COALESCE(up.country_code, op.country_code, gp.country_code, lp.country_code)
+        )), ''),
+        COALESCE(up.address, op.address, gp.address, lp.address),
+        COALESCE(up.name, op.name, gp.name, lp.name)
+    ) AS location,
+    p.lat,
+    p.lon AS lng,
+
+    -- Source / Type
+    COALESCE(up.source_place_type, op.source_place_type, gp.source_place_type, lp.source_place_type)::text AS source_type,
+    op.osm_id::text AS osm_id,
+    jsonb_build_object(
+        'source_place_type', COALESCE(up.source_place_type, op.source_place_type, gp.source_place_type, lp.source_place_type),
+        'place_type', COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type),
+        'country_code', COALESCE(up.country_code, op.country_code, gp.country_code, lp.country_code),
+        'city', COALESCE(up.city, op.city, gp.city, lp.city)
+    ) AS osm_tags,
+
+    -- Contact / Operations
+    COALESCE(up.website, op.website, gp.website, lp.website) AS website,
+    COALESCE(up.opening_hours, op.opening_hours, gp.opening_hours, lp.opening_hours) AS opening_hours,
+    COALESCE(up.phone, op.phone, gp.phone, lp.phone) AS contact_phone,
+    COALESCE(up.email, op.email, gp.email, lp.email) AS contact_email,
+
+    -- Scraped / Cache data (unchanged from campsites_cache)
+    cc.scraped_website_url,
+    cc.scraped_at,
+    cc.scraped_price_info,
+    cc.scraped_data_source::text AS scraped_data_source,
+    cc.description,
+    cc.description_source::text AS description_source,
+    cc.description_generated_at,
+    cc.description_version,
+    cc.estimated_price::numeric AS estimated_price,
+    cc.price_source::text AS price_source,
+    cc.user_price_count::bigint AS user_price_count,
+    cc.user_price_avg::numeric AS user_price_avg,
+    COALESCE(cc.place_types, ARRAY[COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type)]::text[]) AS place_types,
+    p.created_at,
+    p.updated_at,
+
+    -- Google data (unchanged from campsites_cache)
+    cc.place_id AS google_place_id,
+    cc.google_photos,
+    cc.google_reviews,
+    cc.google_data_fetched_at,
+    cc.google_data_expires_at,
+    CASE
+        WHEN cc.google_data_expires_at IS NOT NULL AND cc.google_data_expires_at < NOW()
+        THEN true
+        ELSE false
+    END AS google_data_expired,
+
+    -- Aggregates (unchanged)
+    COALESCE(r.review_count, 0) AS review_count,
+    r.avg_rating,
+    COALESCE(cp.price_count, 0) AS user_price_entries,
+    COALESCE(f.favorite_count, 0) AS favorite_count,
+    cc.rating::numeric AS google_rating,
+    COALESCE(cc.rating::numeric, r.avg_rating) AS rating,
+
+    -- Type derivation
+    CASE
+        WHEN COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type)::text = 'camp_site' THEN 'camping'
+        WHEN COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type)::text = 'camper_stop' THEN 'stellplatz'
+        ELSE 'poi'
+    END AS type,
+
+    -- Amenities (resolved from property tables with column name mapping)
+    COALESCE(up.has_restrooms, op.has_restrooms, gp.has_restrooms, lp.has_restrooms, false) AS has_toilet,
+    COALESCE(up.has_shower, op.has_shower, gp.has_shower, lp.has_shower, false) AS has_shower,
+    COALESCE(up.has_electricity, op.has_electricity, gp.has_electricity, lp.has_electricity, false) AS has_electricity,
+    COALESCE(up.pets_allowed, op.pets_allowed, gp.pets_allowed, lp.pets_allowed, false) AS has_dogs_allowed,
+    COALESCE(up.has_wifi, op.has_wifi, gp.has_wifi, lp.has_wifi, false) AS has_wifi,
+    COALESCE(up.has_beach, op.has_beach, gp.has_beach, lp.has_beach, false) AS has_beach,
+    COALESCE(up.has_laundry, op.has_laundry, gp.has_laundry, lp.has_laundry, false) AS has_laundry,
+    COALESCE(up.has_restaurant, op.has_restaurant, gp.has_restaurant, lp.has_restaurant, false) AS has_restaurant,
+    COALESCE(up.has_cafe, op.has_cafe, gp.has_cafe, lp.has_cafe, false) AS has_bar,
+    COALESCE(up.has_shop, op.has_shop, gp.has_shop, lp.has_shop, false) AS has_shop,
+    COALESCE(up.has_pool, op.has_pool, gp.has_pool, lp.has_pool, false) AS has_pool,
+    COALESCE(up.has_playground, op.has_playground, gp.has_playground, lp.has_playground, false) AS has_playground,
+    COALESCE(up.has_dump_station, op.has_dump_station, gp.has_dump_station, lp.has_dump_station, false) AS has_dump_station,
+    COALESCE(up.has_drinking_water, op.has_drinking_water, gp.has_drinking_water, lp.has_drinking_water, false) AS has_water,
+    COALESCE(up.has_laundry, op.has_laundry, gp.has_laundry, lp.has_laundry, false) AS has_washing_machine,
+    COALESCE(up.has_dishwashing_area, op.has_dishwashing_area, gp.has_dishwashing_area, lp.has_dishwashing_area, false) AS has_dishwasher
+FROM places p
+LEFT JOIN place_user_properties up ON up.place_id = p.id AND up.is_current = true
+LEFT JOIN place_osm_properties op ON op.place_id = p.id AND op.is_current = true
+LEFT JOIN place_google_properties gp ON gp.place_id = p.id AND gp.is_current = true
+LEFT JOIN place_llm_properties lp ON lp.place_id = p.id AND lp.is_current = true
+LEFT JOIN campsites_cache cc ON cc.place_id = p.id::text
+LEFT JOIN (
+    SELECT place_id, COUNT(*) AS review_count, AVG(rating) AS avg_rating
+    FROM campsite_reviews
+    GROUP BY place_id
+) r ON r.place_id = p.id::text
+LEFT JOIN (
+    SELECT place_id, COUNT(*) AS price_count
+    FROM campsite_prices
+    GROUP BY place_id
+) cp ON cp.place_id = p.id::text
+LEFT JOIN (
+    SELECT place_id, COUNT(*) AS favorite_count
+    FROM favorites
+    GROUP BY place_id
+) f ON f.place_id = p.id::text;
+```
+
+================================================================================
+SECTION 6: VERIFICATION CHECKLIST
+================================================================================
+
+[ ] View compiles without errors
+[ ] All 21 deprecated places column references removed
+[ ] All amenity fields use property table resolution
+[ ] Column name mappings applied (has_restrooms→has_toilet, etc.)
+[ ] Resolution priority: user → OSM → Google → LLM (consistent)
+[ ] NULL semantics preserved (no silent defaults except final COALESCE ... false)
+[ ] campsites_cache joins unchanged
+[ ] Aggregate subqueries unchanged
+[ ] Output shape matches existing consumer expectations
+[ ] No dependency on places business columns
+
+================================================================================
+SECTION 7: BREAKING CHANGES
+================================================================================
+
+NONE - The view output shape is preserved exactly.
+- Same column names
+- Same column types
+- Same NULL/boolean semantics
+- Only internal resolution logic changes
+
+Consumers do NOT need to update their queries.
+
+================================================================================
+SECTION 8: MIGRATION ORDER
+================================================================================
+
+1. Create this migration (view rewrite)
+2. Verify view compiles
+3. Run consumer integration tests
+4. Proceed with places column DROP migration (Phase 3)
+
+This view rewrite is a Phase 2 action (consumer transition).
+Phase 3 (column DROP) cannot proceed until this view is deployed.
+
+Evidence: This file, task-13-resolution-order.txt

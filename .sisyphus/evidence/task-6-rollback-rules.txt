@@ -1,0 +1,156 @@
+# Task 6: Rollback Rules and Evidence Policy
+
+## Rollback Triggers
+
+A rollback MUST be triggered automatically if any of these conditions occur:
+
+| Trigger | Condition | Action |
+|---------|-----------|--------|
+| T1-FK-Violation | Foreign key creation fails | Revert to pre-FK migration |
+| T2-View-Recreation | View fails to recreate | Revert view changes |
+| T3-Lock-Timeout | DDL exceeds 5s lock | Abort and retry with smaller batch |
+| T4-Row-Mismatch | Pre/post cleanup row count differs | HALT cleanup, investigate |
+| T5-Consumer-Error | Worker errors spike >10% | Revert consumer migration |
+
+## Lock Safety (Mandatory)
+
+### DDL Lock Timeout
+All ALTER/DROP statements MUST set lock timeout:
+```sql
+-- MANDATORY: Prefix all DDL with lock timeout
+SET lock_timeout = '5s';
+
+-- Then execute DDL
+ALTER TABLE legacy_table DROP COLUMN deprecated_column;
+```
+
+### Why 5 Seconds
+- Long-running migrations block writes
+- Workers timeout waiting for locks
+- 5s is enough for most DDL, forces batched approach for large tables
+
+### Batch Size for Large Tables
+For tables >100k rows:
+```sql
+-- Process in batches of 10k
+UPDATE legacy_table SET deprecated_col = NULL 
+WHERE id IN (SELECT id FROM legacy_table 
+             ORDER BY id LIMIT 10000 OFFSET 0);
+-- Repeat with OFFSET 10000, 20000, etc.
+```
+
+## Evidence Requirements (Mandatory)
+
+### Pre-Cleanup Evidence (Required Before Phase 3)
+
+Before executing ANY DROP:
+1. **Row Count Snapshot**
+   ```sql
+   -- Document current row counts
+   SELECT 'deprecated_table' as table_name, COUNT(*) as row_count 
+   FROM deprecated_table;
+   ```
+
+2. **FK Dependency Audit**
+   ```sql
+   -- Find all FK references to table/column
+   SELECT
+       tc.table_name, 
+       kcu.column_name,
+       ccu.table_name AS foreign_table_name,
+       ccu.column_name AS foreign_column_name
+   FROM information_schema.table_constraints AS tc
+   JOIN information_schema.key_column_usage AS kcu
+     ON tc.constraint_name = kcu.constraint_name
+   JOIN information_schema.constraint_column_usage AS ccu
+     ON ccu.constraint_name = tc.constraint_name
+   WHERE tc.constraint_type = 'FOREIGN KEY'
+   AND (tc.table_name = 'deprecated_table' 
+        OR ccu.table_name = 'deprecated_table');
+   ```
+
+3. **Consumer Compatibility Check**
+   ```sql
+   -- Verify no consumers reference deprecated objects
+   -- Run in product/worker repos after syncing types
+   ```
+
+4. **Backup Verification**
+   ```sql
+   -- Confirm backup exists for recovery
+   SELECT pg_start_backup('pre-cleanup');
+   ```
+
+### Evidence Artifact Files
+
+Create these files in `.sisyphus/evidence/`:
+- `pre-cleanup-rowcounts-{timestamp}.sql` - Row count snapshots
+- `pre-cleanup-fk-dependencies-{timestamp}.sql` - FK audit
+- `pre-cleanup-consumer-check-{timestamp}.txt` - Compatibility results
+
+### Post-Cleanup Evidence
+
+After cleanup completes:
+1. **Application Health Check**
+   ```bash
+   # Verify app responds
+   curl -f https://app.camperplaner.de/health || exit 1
+   
+   # Verify worker processes jobs
+   npm run worker:verify
+   ```
+
+2. **Row Count Verification**
+   ```sql
+   -- Confirm expected row counts post-cleanup
+   SELECT 'remaining_table' as table_name, COUNT(*) as row_count 
+   FROM remaining_table;
+   ```
+
+## Cleanup Execution Rules
+
+### RULE: No Additive + Destructive in Same Window
+- Phase 1 (additive) and Phase 3 (destructive) MUST NOT run in same execution window
+- Separation prevents accidental data loss during transition
+
+### RULE: Evidence Gate Before Cleanup
+- BLOCK cleanup if pre-cleanup evidence artifacts missing
+- Generate evidence even if cleanup will be manual
+
+### RULE: Explicit Rollback Plan
+Before cleanup, document:
+- How to revert if application breaks
+- Estimated time to restore from backup
+- Communication plan for incident
+
+## Rollback Execution Order
+
+If rollback required after cleanup:
+```sql
+-- 1. Restore backup (if data critical)
+-- 2. Re-add dropped columns
+-- 3. Re-create dropped tables
+-- 4. Restore FK constraints
+-- 5. Re-run views/RPCs
+```
+
+## Evidence Storage Convention
+
+Evidence files follow naming:
+```
+pre-cleanup-{evidence-type}-{YYYYMMDD}-{description}.{sql|txt}
+post-cleanup-{evidence-type}-{YYYYMMDD}-{description}.{sql|txt}
+```
+
+Example:
+- `pre-cleanup-rowcounts-20260318-deprecated_columns.sql`
+- `pre-cleanup-fk-dependencies-20260318-place_enrichment.sql`
+- `post-cleanup-health-20260318-120000.txt`
+
+---
+
+**This policy ensures:**
+- No cleanup runs without explicit evidence
+- Lock timeouts prevent production locks
+- Rollback triggers are automated
+- Evidence artifacts enable post-mortem recovery

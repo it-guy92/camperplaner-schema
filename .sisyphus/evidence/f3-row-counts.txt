@@ -1,0 +1,77 @@
+# F3 Row Count Validation Queries
+# Generated: 2026-03-18
+# Purpose: Document row count validation queries for post-migration verification
+
+## Row Count Validation Strategy
+
+After backfill completes, these queries verify data integrity by comparing
+places count against property table current-row counts.
+
+## Validation Queries
+
+### 1. Total Places Count
+```sql
+SELECT COUNT(*) AS total_places FROM places WHERE is_active = true;
+```
+
+### 2. OSM Properties Current Row Count
+```sql
+SELECT COUNT(*) AS osm_current_rows
+FROM place_osm_properties
+WHERE is_current = true;
+```
+
+### 3. Google Properties Current Row Count
+```sql
+SELECT COUNT(*) AS google_current_rows
+FROM place_google_properties
+WHERE is_current = true;
+```
+
+### 4. LLM Properties Current Row Count
+```sql
+SELECT COUNT(*) AS llm_current_rows
+FROM place_llm_properties
+WHERE is_current = true;
+```
+
+### 5. User Properties Current Row Count (per user)
+```sql
+SELECT user_id, COUNT(*) AS user_current_rows
+FROM place_user_properties
+WHERE is_current = true
+GROUP BY user_id;
+```
+
+### 6. Combined Validation View
+```sql
+SELECT
+  (SELECT COUNT(*) FROM places WHERE is_active = true) AS total_places,
+  (SELECT COUNT(*) FROM place_osm_properties WHERE is_current = true) AS osm_current,
+  (SELECT COUNT(*) FROM place_google_properties WHERE is_current = true) AS google_current,
+  (SELECT COUNT(*) FROM place_llm_properties WHERE is_current = true) AS llm_current,
+  (SELECT COUNT(DISTINCT place_id) FROM place_user_properties WHERE is_current = true) AS places_with_user_corrections;
+```
+
+## Expected Variance Rules
+
+- **OSM count** may be LESS than total_places (not all places have OSM source)
+- **Google count** may be LESS than total_places (not all places have Google source)
+- **LLM count** may be LESS than total_places (not all places have LLM enrichment)
+- **User corrections** expected to be sparse initially
+- **No property table count should EXCEED total_places** (indicates duplicate current rows)
+
+## Validation Thresholds
+
+| Check | Expected | Failure Condition |
+|-------|----------|-------------------|
+| OSM <= places | YES | OSM count > places count |
+| Google <= places | YES | Google count > places count |
+| LLM <= places | YES | LLM count > places count |
+| No NULL place_id | YES | Any property row with NULL place_id |
+| No duplicate current | YES | Multiple is_current=true per place_id (except user table) |
+
+## Execution Note
+
+These queries require a running Supabase instance with migrations applied.
+Execute via: `supabase db reset` then run queries against local database.

@@ -1,0 +1,147 @@
+================================================================================
+TASK 2: MINIMAL PLACES TABLE CONTRACT
+================================================================================
+Generated: 2026-03-18
+Plan: place-properties-migration
+Task: 2 - Define minimal places target
+
+================================================================================
+SECTION 1: MINIMAL PLACES TABLE DEFINITION
+================================================================================
+
+The `places` table MUST be reduced to ONLY these 6 columns:
+
+Column      | Type        | Constraints              | Description
+------------|-------------|--------------------------|---------------------------
+id          | bigint      | PK, NOT NULL, GENERATED  | Unique place identifier
+lat         | numeric     | NULL                     | Latitude (WGS84)
+lon         | numeric     | NULL                     | Longitude (WGS84)
+is_active   | boolean     | NOT NULL, DEFAULT true   | Active flag
+created_at  | timestamptz | NOT NULL, DEFAULT NOW()  | Row creation time
+updated_at  | timestamptz | NOT NULL, DEFAULT NOW()  | Last update time
+
+================================================================================
+SECTION 2: COLUMNS TO REMOVE FROM PLACES
+================================================================================
+
+The following columns MUST be removed from `places` because they move to
+the `place_*_properties` tables:
+
+IDENTITY/CONTENT (→ property tables):
+  - place_type
+  - name
+  - description (currently in place_enrichment, will move to property tables)
+
+ADDRESS/LOCATION (→ property tables):
+  - country_code
+  - region
+  - city
+  - postcode
+  - address
+
+GEOMETRY (→ removed entirely, lat/lon remain):
+  - geom (PostGIS geometry column)
+
+CONTACT/OPERATIONS (→ property tables):
+  - website
+  - phone
+  - email
+  - opening_hours
+  - fee_info
+
+AMENITY FLAGS (→ property tables):
+  - has_toilet
+  - has_shower
+  - has_electricity
+  - has_water
+  - has_wifi
+  - pet_friendly
+  - caravan_allowed
+  - motorhome_allowed
+  - tent_allowed
+
+SOURCE METADATA (→ property tables or removed):
+  - source_primary
+  - data_confidence
+  - last_seen_at
+  - last_enriched_at
+
+================================================================================
+SECTION 3: COLUMN COUNT VERIFICATION
+================================================================================
+
+BEFORE (current places table): 31 columns
+  id, place_type, name, geom, lat, lon, country_code, region, city, postcode,
+  address, has_toilet, has_shower, has_electricity, has_water, has_wifi,
+  pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed, website,
+  phone, email, opening_hours, fee_info, source_primary, data_confidence,
+  last_seen_at, last_enriched_at, is_active, created_at, updated_at
+
+AFTER (minimal places table): 6 columns
+  id, lat, lon, is_active, created_at, updated_at
+
+REMOVED: 25 columns
+  All business data columns move to place_*_properties tables.
+
+================================================================================
+SECTION 4: WHY THESE 6 COLUMNS
+================================================================================
+
+id:
+  - Primary key, required for FK references from property tables
+  - Unchanged from current schema
+
+lat, lon:
+  - Minimal spatial reference for map display
+  - Replaces geom (PostGIS geometry) which is being removed
+  - Sufficient for point-based queries without PostGIS dependency
+  - Source-specific coordinates remain in property tables as source_lat/source_lon
+
+is_active:
+  - Soft-delete flag for place lifecycle management
+  - Used by import system to mark stale/removed places
+  - NOT business data - it's infrastructure
+
+created_at, updated_at:
+  - Standard audit timestamps
+  - Required for data freshness tracking
+  - NOT business data - it's infrastructure
+
+================================================================================
+SECTION 5: WHAT DOES NOT BELONG IN PLACES
+================================================================================
+
+BUSINESS DATA:
+  - Names, descriptions → property tables
+  - Addresses, contact info → property tables
+  - Amenity flags → property tables
+  - Place types → property tables
+
+SOURCE METADATA:
+  - source_primary → each source has its own property row
+  - data_confidence → computed at read time from source resolution
+  - last_seen_at → tracked per-source in property tables
+  - last_enriched_at → tracked per-source in property tables
+
+GEOMETRY:
+  - geom → removed; lat/lon sufficient for minimal table
+  - Full geometry remains in osm_source.geom if needed
+
+================================================================================
+SECTION 6: FOREIGN KEY IMPLICATIONS
+================================================================================
+
+After cleanup, these tables reference places.id:
+  - place_osm_properties (place_id → places.id)
+  - place_google_properties (place_id → places.id)
+  - place_llm_properties (place_id → places.id)
+  - place_user_properties (place_id → places.id)
+  - place_google_reviews (via google_source_id → place_google_sources.id)
+  - place_google_photos (via google_source_id → place_google_sources.id)
+  - enrichment_jobs (place_id → places.id)
+
+No FK relationships are broken by removing business columns from places.
+
+================================================================================
+END OF TASK 2 MINIMAL PLACES CONTRACT
+================================================================================

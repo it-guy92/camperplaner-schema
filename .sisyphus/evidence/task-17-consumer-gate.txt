@@ -1,0 +1,277 @@
+# Task 17: Consumer Gate and Cutover Timing
+
+## Overview
+This file documents the explicit gates and timing requirements for type regeneration, downstream sync, and consumer code cutover. It ensures consumers stop reading deprecated fields only after migration is complete and types are synced.
+
+---
+
+## Type Regeneration Command
+
+```bash
+# From schema repository root
+supabase gen types typescript --local > generated/database.types.ts
+```
+
+**Critical Timing:** Run AFTER migration executes, NOT before.
+
+---
+
+## Phase Gates
+
+### Phase 1 Gate: Additive Migration
+
+| Gate | Condition | Owner | Blocked By |
+|------|-----------|-------|------------|
+| G1.1 | Migration file created | Schema Repo | None |
+| G1.2 | Migration merged to main | Schema Repo | G1.1 |
+| G1.3 | Migration executed in staging | Product | G1.2 |
+| G1.4 | New tables visible (SELECT COUNT works) | Product | G1.3 |
+| G1.5 | PostgREST cache refreshed | Product | G1.4 |
+| G1.6 | Types regenerated | Schema Repo | G1.5 |
+| G1.7 | Types committed to main | Schema Repo | G1.6 |
+| G1.8 | Types synced in product | Product | G1.7 |
+| G1.9 | Product code updated | Product | G1.8 |
+| G1.10 | Product compiles with new types | Product | G1.9 |
+| G1.11 | Types synced in worker | Worker | G1.7 |
+| G1.12 | Worker code updated | Worker | G1.11 |
+| G1.13 | Worker compiles with new types | Worker | G1.12 |
+
+**Cutover Trigger:** Gate G1.13 reached = Phase 1 complete
+
+---
+
+### Phase 2 Gate: Transition Migration
+
+| Gate | Condition | Owner | Blocked By |
+|------|-----------|-------|------------|
+| G2.1 | Migration file created | Schema Repo | Phase 1 complete |
+| G2.2 | Migration merged to main | Schema Repo | G2.1 |
+| G2.3 | Migration executed in staging | Product | G2.2 |
+| G2.4 | Views return correct data | Product | G2.3 |
+| G2.5 | RPCs work with new params | Product | G2.4 |
+| G2.6 | Types regenerated | Schema Repo | G2.5 |
+| G2.7 | Types committed to main | Schema Repo | G2.6 |
+| G2.8 | Types synced in product | Product | G2.7 |
+| G2.9 | Product tests pass | Product | G2.8 |
+| G2.10 | Types synced in worker | Worker | G2.7 |
+| G2.11 | Worker tests pass | Worker | G2.10 |
+
+**Cutover Trigger:** Gate G2.11 reached = Phase 2 complete
+
+---
+
+### Phase 3 Gate: Cleanup Migration (STRICT)
+
+| Gate | Condition | Owner | Blocked By |
+|------|-----------|-------|------------|
+| G3.1 | Evidence artifacts exist | Schema Repo | Phase 2 complete |
+| G3.2 | 24-hour observation window passed | Schema Repo | G3.1 |
+| G3.3 | Product migration complete (all deprecated refs removed) | Product | G3.2 |
+| G3.4 | Worker migration complete (all deprecated refs removed) | Worker | G3.3 |
+| G3.5 | Migration file created | Schema Repo | G3.4 |
+| G3.6 | Migration merged to main | Schema Repo | G3.5 |
+| G3.7 | Migration executed in staging | Product | G3.6 |
+| G3.8 | Deprecated columns actually dropped | Product | G3.7 |
+| G3.9 | Types regenerated (deprecated fields removed) | Schema Repo | G3.8 |
+| G3.10 | Types committed to main | Schema Repo | G3.9 |
+| G3.11 | Types synced in product | Product | G3.10 |
+| G3.12 | Types synced in worker | Worker | G3.10 |
+| G3.13 | Product compiles (no deprecated refs) | Product | G3.11 |
+| G3.14 | Worker compiles (no deprecated refs) | Worker | G3.12 |
+
+**Cutover Trigger:** Gate G3.14 reached = Phase 3 complete, cleanup done
+
+---
+
+## Type Sync Timing
+
+### Standard Timing
+
+| Event | When | Who |
+|-------|------|-----|
+| Types generated | After migration executes | Schema Repo |
+| Types committed | Immediately after generation | Schema Repo |
+| Types synced | Within 1 business day | Product/Worker |
+
+### Accelerated Timing (Urgent)
+
+For hotfixes (per AGENTS.md Section "Hotfix Escalation Path"):
+- Types committed within hours, not days
+- Consumers sync same day
+- Fast-track approval available
+
+---
+
+## Consumer Code Cutover Rules
+
+### Phase 1: Start Writing to New Schema
+
+**Before Cutover:**
+- Old code still writes to legacy tables
+- New code can read new tables
+
+**Cutover Point:** Worker deploys with new write logic
+
+**After Cutover:**
+- New code writes to new tables
+- Legacy writes can continue (dual-write period)
+
+### Phase 2: Switch to New Views/RPCs
+
+**Before Cutover:**
+- Product reads from legacy views
+- Worker calls legacy functions
+
+**Cutover Point:** Both repos deploy with new view/function calls
+
+**After Cutover:**
+- All reads go through new views
+- All function calls use new signatures
+
+### Phase 3: Stop Reading Deprecated Fields
+
+**Before Cutover:**
+- Product code may still reference deprecated fields
+- Worker code may still reference deprecated fields
+
+**Cutover Point:** Gate G3.3 AND G3.4 satisfied (both confirmed removal)
+
+**After Cutover:**
+- Schema drops deprecated columns
+- No consumer code references them
+
+---
+
+## Deprecation Timeline
+
+```
+Timeline (Example)
+
+Day 0: Phase 1 merges
+  |
+  +-- Product deploys migration
+  |
+  +-- Types regenerated
+  |
+  +-- Consumer sync (within 1 day)
+  |
+  +-- Consumer code updated (within 3 days)
+
+Day 7: Phase 2 merges
+  |
+  +-- Product deploys migration
+  |
+  +-- Types regenerated
+  |
+  +-- Consumer sync (within 1 day)
+  |
+  +-- Consumer code updated (within 3 days)
+
+Day 14: Phase 3 ready
+  |
+  +-- Evidence artifacts exist: CHECK
+  +-- 24-hour observation: PASS
+  +-- Consumer migration complete: CONFIRM
+  |
+  +-- Phase 3 merges
+  |
+  +-- Migration drops deprecated
+  |
+  +-- Types regenerated
+  |
+  +-- Consumer sync (within 1 day)
+  |
+  +-- DEPRECATED FIELDS GONE
+```
+
+---
+
+## Validation Checkpoints
+
+### Product Validation
+
+```bash
+# After syncing types
+cd apps/web
+npm run typecheck
+npm test
+
+# Verify no deprecated field references
+grep -r "deprecated_field_name" --include="*.ts" --include="*.tsx" src/
+```
+
+### Worker Validation
+
+```bash
+# After syncing types
+npm run typecheck
+npm test
+
+# Verify no deprecated field references
+grep -r "deprecated_field_name" --include="*.ts" src/
+```
+
+---
+
+## Rollback Triggers
+
+| Trigger | Condition | Action |
+|---------|-----------|--------|
+| Migration fails | Staging deployment fails | Revert, investigate |
+| Type gen fails | supabase gen exits non-zero | Revert migration |
+| Product compile error | Type errors after sync | Revert types, investigate |
+| Worker compile error | Type errors after sync | Revert types, investigate |
+| Product test failure | Tests fail after sync | Block Phase 3 until fixed |
+| Worker test failure | Tests fail after sync | Block Phase 3 until fixed |
+
+---
+
+## Communication Requirements
+
+### Before Each Phase
+
+1. Schema repo posts issue: "Upcoming Phase N migration"
+2. Schema repo tags: @product-maintainer, @worker-maintainer
+3. Impact assessment included
+
+### After Each Phase
+
+1. Schema repo posts: "Phase N merged"
+2. Includes migration details
+3. Includes sync commands
+4. Includes deadline (1 business day)
+
+### Phase 3 Specific
+
+1. Schema repo verifies evidence artifacts
+2. Schema repo verifies observation window
+3. Schema repo asks: "Are deprecated refs removed?"
+4. Product confirms: "Yes, all refs removed"
+5. Worker confirms: "Yes, all refs removed"
+6. ONLY THEN: Schema repo proceeds with cleanup
+
+---
+
+## Cutover Decision Matrix
+
+| Scenario | Can Proceed? | Condition |
+|----------|--------------|-----------|
+| Types synced, product updated, worker pending | Worker only | Product gate passed |
+| Types synced, worker updated, product pending | Product only | Worker gate passed |
+| Types synced, both updated, tests passing | YES | All gates passed |
+| Phase 3, product done, worker pending | NO | Blocked by worker |
+| Phase 3, observation not complete | NO | Blocked by time |
+| Phase 3, evidence missing | NO | Blocked by artifacts |
+
+---
+
+## References
+
+- AGENTS.md - Post-Merge Consumer Sync Contract
+- task-12-type-sync.txt - Type regeneration strategy
+- task-15-cleanup-gates.txt - Phase 3 gate requirements
+- task-16-drop-sequence.txt - Cleanup execution order
+
+---
+
+Last Updated: 2026-03-18

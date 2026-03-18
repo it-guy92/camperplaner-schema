@@ -1,0 +1,251 @@
+================================================================================
+TASK 3 EVIDENCE: Null Semantics for Boolean Columns
+================================================================================
+Generated: 2026-03-18
+Task: Design one-current-row constraints, indexes, and null semantics
+
+================================================================================
+1. NULL VS FALSE SEMANTICS
+================================================================================
+
+This document defines the semantic meaning of NULL vs FALSE for boolean
+columns in the place_*_properties tables.
+
+--------------------------------------------------------------------------------
+1.1 Core Principle
+--------------------------------------------------------------------------------
+
+  NULL    = "Source made no claim about this property"
+  FALSE   = "Source explicitly stated this property is not present"
+  TRUE    = "Source explicitly stated this property is present"
+
+This semantic distinction is CRITICAL for:
+- Data quality tracking (did the source even look at this field?)
+- Conflict resolution (user said X, but source never claimed Y)
+- Debugging (was this field omitted or explicitly denied?)
+
+--------------------------------------------------------------------------------
+1.2 Why NOT Default to FALSE
+--------------------------------------------------------------------------------
+
+Defaulting boolean columns to FALSE would:
+- Lose information about whether the source even examined the field
+- Make it impossible to distinguish "source didn't check" from "source checked and found no"
+- Break conflict resolution (no way to know if source had an opinion)
+- Violate the principle that NULL means "no claim" in SQL best practices
+
+WRONG:
+  has_wifi boolean NOT NULL DEFAULT false  -- BAD: assumes "no" without source evidence
+
+CORRECT:
+  has_wifi boolean NOT NULL DEFAULT NULL   -- GOOD: "source made no claim"
+
+================================================================================
+2. COLUMN DEFINITION PATTERN
+================================================================================
+
+All boolean columns in property tables MUST be defined as:
+
+  column_name boolean NOT NULL DEFAULT NULL
+
+This enforces:
+- Column must have a value (NOT NULL)
+- Default is NULL (no claim)
+- Application must explicitly set TRUE or FALSE when making a claim
+
+Example:
+  -- WRONG (loses semantic information)
+  has_electricity boolean NOT NULL DEFAULT false,
+  has_water boolean NOT NULL DEFAULT false,
+  
+  -- CORRECT (preserves no-claim semantics)
+  has_electricity boolean NOT NULL DEFAULT NULL,
+  has_water boolean NOT NULL DEFAULT NULL,
+
+================================================================================
+3. SOURCE-SPECIFIC SEMANTICS
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1 OSM Properties (place_osm_properties)
+--------------------------------------------------------------------------------
+
+OSM sources may or may not have tags for certain amenities. When OSM data
+is imported:
+- If OSM has a tag → set to TRUE or FALSE based on tag value
+- If OSM has no tag → leave as NULL (no claim)
+
+Example:
+  -- OSM says "yes, has electricity"
+  has_electricity = true
+  
+  -- OSM says "no electricity"  
+  has_electricity = false
+  
+  -- OSM never mentioned electricity
+  has_electricity = NULL
+
+--------------------------------------------------------------------------------
+3.2 Google Properties (place_google_properties)
+--------------------------------------------------------------------------------
+
+Google Places API may return certain amenities or leave them omitted:
+- If Google returns amenity info → set to TRUE or FALSE
+- If Google omits amenity → leave as NULL (no claim)
+
+Example:
+  -- Google indicates WiFi is available
+  has_wifi = true
+  
+  -- Google indicates no WiFi (explicit "false" in API)
+  has_wifi = false
+  
+  -- Google never mentioned WiFi
+  has_wifi = NULL
+
+--------------------------------------------------------------------------------
+3.3 LLM Properties (place_llm_properties)
+--------------------------------------------------------------------------------
+
+LLM enrichment may extract or infer certain properties:
+- If LLM explicitly extracted a value → set to TRUE or FALSE with confidence
+- If LLM did not mention the property → leave as NULL (no claim)
+
+Example:
+  -- LLM extracted "has shower" with high confidence
+  has_shower = true
+  has_shower_confidence = 0.95
+  
+  -- LLM explicitly said "no pets allowed"
+  pet_friendly = false
+  pet_friendly_confidence = 0.88
+  
+  -- LLM never mentioned pets
+  pet_friendly = NULL
+
+--------------------------------------------------------------------------------
+3.4 User Properties (place_user_properties)
+--------------------------------------------------------------------------------
+
+User corrections follow the same pattern:
+- User explicitly corrects a value → set to TRUE or FALSE
+- User never mentioned the property → NULL (no correction)
+
+Example:
+  -- User says "this place now has WiFi"
+  has_wifi = true
+  -- User is claiming something that may differ from source
+  
+  -- User says "the website changed"
+  website = 'https://new-website.com'
+  -- User is making a factual correction
+  
+  -- User hasn't provided info about this amenity
+  has_shower = NULL
+  -- No user correction for this field
+
+================================================================================
+4. QUERY PATTERNS FOR NULL SEMANTICS
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1 Find places where source made NO claim
+--------------------------------------------------------------------------------
+
+-- Places where OSM made no claim about WiFi
+SELECT * FROM place_osm_properties 
+WHERE has_wifi IS NULL;
+
+--------------------------------------------------------------------------------
+4.2 Find places where source explicitly said NO
+--------------------------------------------------------------------------------
+
+-- Places where OSM explicitly said NO WiFi
+SELECT * FROM place_osm_properties 
+WHERE has_wifi = false;
+
+--------------------------------------------------------------------------------
+4.3 Find places with any source information
+--------------------------------------------------------------------------------
+
+-- Places where OSM has any opinion about WiFi (either way)
+SELECT * FROM place_osm_properties 
+WHERE has_wifi IS NOT NULL;
+
+--------------------------------------------------------------------------------
+4.4 Conflict detection example
+--------------------------------------------------------------------------------
+
+-- Find places where user disagrees with OSM
+SELECT 
+    p.id as place_id,
+    o.has_wifi as osm_wifi,
+    u.has_wifi as user_wifi
+FROM places p
+JOIN place_osm_properties o ON p.id = o.place_id AND o.is_current = true
+JOIN place_user_properties u ON p.id = u.place_id AND u.is_current = true
+WHERE o.has_wifi IS DISTINCT FROM u.has_wifi;
+
+================================================================================
+5. MIGRATION CONSIDERATIONS
+================================================================================
+
+When backfilling from legacy tables:
+
+1. Identify the source of each boolean value
+2. If source explicitly provided the value → set TRUE or FALSE
+3. If source never provided the value → set NULL
+4. NEVER convert legacy NULLs to FALSE
+
+Example backfill:
+  -- CORRECT: Preserve no-claim semantics
+  INSERT INTO place_osm_properties (place_id, has_wifi, is_current)
+  SELECT 
+      p.id,
+      CASE 
+          WHEN p.has_wifi IS NULL THEN NULL  -- OSM never claimed
+          ELSE p.has_wifi  -- Use actual value
+      END,
+      true
+  FROM places p;
+
+================================================================================
+6. APPLICATION CODE GUIDANCE
+================================================================================
+
+When inserting/updating property rows:
+
+1. Check if you have explicit source information
+2. If YES → set boolean to TRUE or FALSE (explicit claim)
+3. If NO → leave as NULL (no claim made)
+
+// WRONG - loses semantic meaning
+place.set('has_wifi', false);  // Assumes "no" without checking
+
+// CORRECT - preserves meaning
+if (source.hasWifi !== undefined) {
+    place.set('has_wifi', source.hasWifi);  // Explicit value
+} else {
+    place.set('has_wifi', null);  // No claim made
+}
+
+================================================================================
+7. DOCUMENTATION REQUIREMENTS
+================================================================================
+
+All property table schemas must document:
+
+1. Boolean columns default to NULL
+2. NULL means "source made no claim"
+3. FALSE means "source explicitly said no"
+4. TRUE means "source explicitly said yes"
+
+This must be in:
+- Table COMMENT
+- Column COMMENTs
+- Schema documentation
+- API documentation
+
+================================================================================
+END OF EVIDENCE
+================================================================================

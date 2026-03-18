@@ -1,0 +1,179 @@
+================================================================================
+TASK 5: GEOMETRY & SPATIAL DEPENDENCY AUDIT
+================================================================================
+Date: 2026-03-18
+Purpose: Inventory all geometry/spatial dependencies before removing `geom` from `places`
+Scope: All SQL, MD, TS files in schema repository
+
+================================================================================
+1. TABLES WITH GEOMETRY/SPATIAL COLUMNS
+================================================================================
+
+1.1 places (TARGET FOR `geom` REMOVAL)
+    - geom: geometry(Point, 4326) NOT NULL  ← PRIMARY TARGET
+    - lat: numeric NULL                      ← KEEP (coordinate fallback)
+    - lon: numeric NULL                      ← KEEP (coordinate fallback)
+    Status: geom is NOT NULL, lat/lon are NULL
+    Risk: HIGH - geom is the authoritative location source
+
+1.2 osm_source (KEEPS GEOMETRY)
+    - geometry_kind: text NULL
+    - geometry_hash: text NULL
+    - centroid: geometry(Point, 4326) NULL
+    - geom: geometry NULL
+    Status: All geometry columns NULL in production (per audit)
+    Risk: LOW - columns exist but unused
+
+1.3 trips (GEOGRAPHY COLUMNS)
+    - start_location_geo: geography(Point, 4326) NULL
+    - end_location_geo: geography(Point, 4326) NULL
+    - route_geometry: jsonb NULL
+    Status: Independent of places.geom
+    Risk: NONE - no dependency on places.geom
+
+1.4 trip_stops (GEOGRAPHY COLUMN)
+    - location_geo: geography(Point, 4326) NULL
+    Status: Independent of places.geom
+    Risk: NONE - no dependency on places.geom
+
+1.5 favorites (GEOGRAPHY COLUMN)
+    - location_geo: geography(Point, 4326) NULL
+    Status: Independent of places.geom
+    Risk: NONE - no dependency on places.geom
+
+1.6 campsites_cache (NO GEOMETRY)
+    - lat: numeric NOT NULL
+    - lng: numeric NOT NULL
+    Status: Uses plain numeric coords, no PostGIS
+    Risk: NONE
+
+1.7 campsites (NEW TABLE - GEOGRAPHY)
+    - location: geography(Point, 4326) NOT NULL
+    Status: Separate table, not linked to places.geom
+    Risk: NONE - independent table
+
+1.8 google_place_matches (GEOGRAPHY)
+    - osm_location: geography(Point, 4326) NULL
+    Status: Independent of places.geom
+    Risk: NONE
+
+================================================================================
+2. SPATIAL INDEXES
+================================================================================
+
+2.1 places table
+    - idx_places_geom: GIST index on places.geom  ← MUST DROP with geom column
+    - No index on lat/lon (consider adding after migration)
+
+2.2 Other tables with GIST indexes (UNAFFECTED)
+    - idx_trips_start_location: GIST on trips.start_location_geo
+    - idx_trips_end_location: GIST on trips.end_location_geo
+    - idx_trip_stops_location: GIST on trip_stops.location_geo
+    - idx_favorites_location: GIST on favorites.location_geo
+    - idx_campsites_location: GIST on campsites.location
+    - idx_google_place_matches_location: GIST on google_place_matches.osm_location
+
+================================================================================
+3. POSTGIS FUNCTIONS USED IN MIGRATIONS
+================================================================================
+
+3.1 Functions referencing places.geom
+    - NONE FOUND - no migration directly queries places.geom with ST_* functions
+
+3.2 Functions used elsewhere (UNAFFECTED)
+    - ST_SetSRID, ST_MakePoint: Used in 20260310000004_migrate_to_postgis.sql
+    - ST_Y, ST_X: Used in 20260310000007_create_campsite_full_view.sql
+    - ST_SetSRID, ST_MakePoint: Used in 20260310000010_migrate_campsites_data.sql
+    All of these operate on OTHER tables, not places.geom
+
+================================================================================
+4. TYPE SYSTEM EXPOSURE (database.types.ts)
+================================================================================
+
+4.1 places.geom type definition
+    Row:    geom: string
+    Insert: geom: string
+    Update: geom?: string
+    Impact: Removing geom requires regenerating types
+
+4.2 osm_source geometry types (KEEP)
+    - geometry_kind: string | null
+    - geometry_hash: string | null
+    - centroid: string | null
+    - geom: string | null
+
+4.3 Other geometry types (UNAFFECTED)
+    - trips.start_location_geo: string | null
+    - trips.end_location_geo: string | null
+    - trips.route_geometry: Json | null
+    - trip_stops.location_geo: string | null
+    - favorites.location_geo: string | null
+
+================================================================================
+5. DOCUMENTATION REFERENCES
+================================================================================
+
+5.1 docs/database-schema.md
+    Line 238: | `geom` | geometry | NOT NULL | PostGIS geometry |
+    Action: Remove this row from places table documentation
+
+5.2 docs/er-diagram.md
+    Line 114: geometry geom
+    Line 876: geometry geom (domain-specific diagram)
+    Action: Remove from both places diagram instances
+
+5.3 docs/database-access-audit.md
+    Line 435: | `geom` | `geography` | Spatial data | observed in schema | ...
+    Action: Update to reflect removal
+
+================================================================================
+6. CONSUMER DEPENDENCIES (from access audit)
+================================================================================
+
+6.1 Product repo references to places.geom
+    - product/runtime camperplaner-product/apps/web/scripts/analyze-germany.mjs
+    - product/runtime camperplaner-product/apps/web/scripts/germany-e2e-final-report.mjs
+    - product/runtime camperplaner-product/apps/web/scripts/germany-e2e-report.mjs
+    - product/runtime camperplaner-product/apps/web/scripts/germany-e2e-test.mjs
+    - product/runtime camperplaner-product/apps/web/src/app/api/admin/cutover/metrics/route.ts
+    - product/runtime camperplaner-product/apps/web/src/app/api/admin/osm/status/route.ts
+    - product/test camperplaner-product/apps/web/e2e/europe-import.spec.ts
+    Action: These consumers must be notified to switch to lat/lon
+
+6.2 Worker repo references to places.geom
+    - NONE FOUND in worker repo
+
+================================================================================
+7. ROLLBACK CONSIDERATIONS
+================================================================================
+
+7.1 rollback_restructure.sql
+    Line 46: -- Drop PostGIS columns (keep original JSONB coords)
+    Note: Existing rollback script already handles PostGIS column drops
+
+================================================================================
+8. SUMMARY
+================================================================================
+
+SAFE TO REMOVE:
+- places.geom column
+- idx_places_geom index
+- Documentation references to places.geom
+- Type definitions for places.geom
+
+MUST KEEP:
+- places.lat, places.lon (coordinate fallback)
+- osm_source.geom, osm_source.centroid (source tracking)
+- All geography columns in trips, trip_stops, favorites, campsites
+- All GIST indexes on OTHER tables
+
+CONSUMER IMPACT:
+- 7 product repo files reference places.geom
+- 0 worker repo files reference places.geom
+- Consumers must migrate to lat/lon queries
+
+NO BLOCKING DEPENDENCIES FOUND:
+- No ST_* functions query places.geom
+- No views depend on places.geom
+- No RPC functions return places.geom
+- lat/lon columns provide complete fallback

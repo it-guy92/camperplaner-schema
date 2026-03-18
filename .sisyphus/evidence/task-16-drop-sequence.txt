@@ -1,0 +1,175 @@
+# Task 16: Deprecated Table Drop Sequence
+# Generated: 2026-03-18
+# Purpose: Ordered removal plan for deprecated tables after cutover validation
+
+================================================================================
+SECTION 1: DEPRECATED TABLE INVENTORY
+================================================================================
+
+Six tables are deprecated and scheduled for removal:
+
+| Table                          | Parent Table                  | Children                              | Archive Decision |
+|--------------------------------|-------------------------------|---------------------------------------|------------------|
+| place_llm_evidence_markers     | place_llm_enrichments         | none                                  | DISCARD          |
+| place_evidence_markers         | place_source_evidence_runs    | none                                  | DISCARD          |
+| place_evidence_sources         | place_source_evidence_runs    | none                                  | DISCARD          |
+| place_google_amenities         | place_google_sources          | none                                  | DISCARD          |
+| place_google_types             | place_google_sources          | none                                  | DISCARD          |
+| place_llm_facts                | place_llm_enrichments         | none                                  | DISCARD          |
+| place_llm_sources              | place_llm_enrichments         | none                                  | DISCARD          |
+| place_source_evidence_runs     | (root)                        | place_evidence_sources, place_evidence_markers | ARCHIVE |
+
+================================================================================
+SECTION 2: FOREIGN KEY DEPENDENCY GRAPH
+================================================================================
+
+Drop order MUST respect FK dependencies (children before parents):
+
+```
+places (id)
+  ├── place_source_evidence_runs (place_id) ← DEPRECATED
+  │     ├── place_evidence_sources (evidence_run_id) ← DEPRECATED
+  │     └── place_evidence_markers (evidence_run_id) ← DEPRECATED
+  ├── place_llm_enrichments (place_id) ← RETAINED
+  │     ├── place_llm_facts (llm_enrichment_id) ← DEPRECATED
+  │     ├── place_llm_sources (llm_enrichment_id) ← DEPRECATED
+  │     └── place_llm_evidence_markers (llm_enrichment_id) ← DEPRECATED
+  └── place_google_sources (place_id) ← RETAINED
+        ├── place_google_reviews (google_source_id) ← RETAINED
+        ├── place_google_photos (google_source_id) ← RETAINED
+        ├── place_google_types (google_source_id) ← DEPRECATED
+        └── place_google_amenities (google_source_id) ← DEPRECATED
+```
+
+================================================================================
+SECTION 3: DROP SEQUENCE (4 Waves)
+================================================================================
+
+Wave 1: Leaf children with no dependents (safest first)
+-------------------------------------------------------
+Order | Table                        | FK Constraint                    | Rationale
+------|------------------------------|----------------------------------|----------------------------------
+1     | place_llm_evidence_markers   | llm_enrichment_id → place_llm_enrichments.id | No data mapped to new schema; pure process data
+2     | place_evidence_markers       | evidence_run_id → place_source_evidence_runs.id | Child of deprecated parent; no dependents
+3     | place_evidence_sources       | evidence_run_id → place_source_evidence_runs.id | Child of deprecated parent; no dependents
+
+Wave 2: Leaf children with mapped data (flatten complete)
+---------------------------------------------------------
+Order | Table                        | FK Constraint                    | Rationale
+------|------------------------------|----------------------------------|----------------------------------
+4     | place_google_amenities       | google_source_id → place_google_sources.id | Flattened into place_google_properties; backfill verified
+5     | place_google_types           | google_source_id → place_google_sources.id | Flattened into place_google_properties; backfill verified
+6     | place_llm_facts              | llm_enrichment_id → place_llm_enrichments.id | Flattened into place_llm_properties; backfill verified
+7     | place_llm_sources            | llm_enrichment_id → place_llm_enrichments.id | Aggregated into place_llm_properties.source_urls; backfill verified
+
+Wave 3: Deprecated parent with audit archive
+---------------------------------------------
+Order | Table                        | FK Constraint                    | Rationale
+------|------------------------------|----------------------------------|----------------------------------
+8     | place_source_evidence_runs   | place_id → places.id             | ARCHIVE source_evidence + evidence_markers to cold storage BEFORE drop
+
+Wave 4: Post-drop cleanup
+--------------------------
+Order | Action                       | Rationale
+------|------------------------------|----------------------------------
+9     | Remove deprecated types from generated/database.types.ts | Clean up type exposure
+10    | Update docs/database-schema.md | Remove deprecated table documentation
+
+================================================================================
+SECTION 4: ARCHIVE DECISIONS
+================================================================================
+
+| Table                        | Archive? | Archive Target          | Columns to Archive                                    | Rationale                                    |
+|------------------------------|----------|-------------------------|-------------------------------------------------------|----------------------------------------------|
+| place_llm_evidence_markers   | NO       | —                       | —                                                     | Process data; trust captured in trust_score   |
+| place_evidence_markers       | NO       | —                       | —                                                     | Process data; not needed post-cutover         |
+| place_evidence_sources       | NO       | —                       | —                                                     | Process data; not needed post-cutover         |
+| place_google_amenities       | NO       | —                       | —                                                     | Flattened into place_google_properties        |
+| place_google_types           | NO       | —                       | —                                                     | Flattened into place_google_properties        |
+| place_llm_facts              | NO       | —                       | —                                                     | Flattened into place_llm_properties           |
+| place_llm_sources            | NO       | —                       | —                                                     | Aggregated into place_llm_properties.source_urls |
+| place_source_evidence_runs   | YES      | S3/cold storage (CSV)   | source_evidence, evidence_markers, place_id, job_id   | Debugging capability; audit trail preservation |
+
+Archive procedure for place_source_evidence_runs:
+1. Export to CSV: SELECT place_id, job_id, source_evidence, evidence_markers, created_at FROM place_source_evidence_runs
+2. Upload to cold storage bucket (e.g., s3://camperplaner-archive/evidence-runs/)
+3. Verify upload integrity (checksum)
+4. Document archive location in cutover_audit_log
+5. THEN proceed with DROP TABLE
+
+================================================================================
+SECTION 5: DROP SQL TEMPLATE
+================================================================================
+
+Each drop MUST use lock safety:
+
+```sql
+SET lock_timeout = '5s';
+
+-- Wave 1: Leaf children (no dependents)
+DROP TABLE IF EXISTS place_llm_evidence_markers CASCADE;
+DROP TABLE IF EXISTS place_evidence_markers CASCADE;
+DROP TABLE IF EXISTS place_evidence_sources CASCADE;
+
+-- Wave 2: Leaf children with mapped data
+DROP TABLE IF EXISTS place_google_amenities CASCADE;
+DROP TABLE IF EXISTS place_google_types CASCADE;
+DROP TABLE IF EXISTS place_llm_facts CASCADE;
+DROP TABLE IF EXISTS place_llm_sources CASCADE;
+
+-- Wave 3: Deprecated parent (AFTER archive)
+DROP TABLE IF EXISTS place_source_evidence_runs CASCADE;
+```
+
+CASCADE is used because:
+- All FK constraints point TO these tables (they are children or leaf parents)
+- No other tables depend on these tables for data integrity
+- Views (campsite_full, etc.) reference the RETAINED tables, not deprecated ones
+
+================================================================================
+SECTION 6: VERIFICATION CHECKLIST
+================================================================================
+
+Before executing ANY drop:
+- [ ] Backfill verified: target property tables have data for all places
+- [ ] Read cutover verified: no application code reads from deprecated tables
+- [ ] Rollback checkpoint: task-6-checkpoints.txt P2→P3 gate passed
+- [ ] Archive complete: place_source_evidence_runs archived to cold storage
+- [ ] Consumer repos synced: generated/database.types.ts deployed
+- [ ] 24-hour observation window: no errors after read cutover
+
+After executing drops:
+- [ ] Application functions normally (smoke test)
+- [ ] Views return expected data (campsite_full, campsite_review_summary, etc.)
+- [ ] RPC get_place_source_bundle returns correct structure
+- [ ] No FK constraint violations in logs
+- [ ] cutover_audit_log entry created for each drop wave
+
+================================================================================
+SECTION 7: ROLLBACK PLAN
+================================================================================
+
+If issues detected after drop:
+1. STOP further drops immediately
+2. Restore from pre-drop backup (taken before Wave 1)
+3. Revert consumer type syncs
+4. Investigate root cause
+5. Re-plan drop sequence with additional gates
+
+Pre-drop backup command:
+```sql
+-- Run BEFORE Wave 1
+pg_dump -t place_llm_evidence_markers -t place_evidence_markers -t place_evidence_sources \
+        -t place_google_amenities -t place_google_types -t place_llm_facts \
+        -t place_llm_sources -t place_source_evidence_runs \
+        > pre_drop_backup_$(date +%Y%m%d).sql
+```
+
+---
+
+**Verification:**
+- [ ] task-16-drop-sequence.txt created at .sisyphus/evidence/task-16-drop-sequence.txt
+- [ ] All 8 deprecated tables sequenced with explicit order
+- [ ] Archive decision documented for place_source_evidence_runs
+- [ ] FK dependencies respected in drop order
+- [ ] Rollback plan documented

@@ -1,0 +1,74 @@
+================================================================================
+F2 EVIDENCE: One-Current-Row Constraint Verification
+================================================================================
+Generated: 2026-03-18
+Source: supabase/migrations/20260318200000_add_property_tables.sql (PART 5)
+Reference: .sisyphus/evidence/task-3-current-row-rules.txt
+
+================================================================================
+1. CONSTRAINT VERIFICATION MATRIX
+================================================================================
+
+Table                      | Constraint Name                           | Column(s)              | WHERE Clause         | Status
+---------------------------|-------------------------------------------|------------------------|----------------------|-------
+place_osm_properties       | uidx_osm_properties_place_current         | place_id               | is_current = true    | PASS
+place_google_properties    | uidx_google_properties_place_current      | place_id               | is_current = true    | PASS
+place_llm_properties      | uidx_llm_properties_place_current         | place_id               | is_current = true    | PASS
+place_user_properties      | uidx_user_properties_place_user_current   | place_id, user_id      | is_current = true    | PASS
+
+================================================================================
+2. DETAILED VERIFICATION
+================================================================================
+
+2.1 place_osm_properties (lines 476-478)
+    Expected: CREATE UNIQUE INDEX uidx_osm_properties_place_current
+                  ON place_osm_properties(place_id)
+                  WHERE is_current = true;
+    Actual:   MATCHES EXACTLY
+    Verdict:  PASS
+
+2.2 place_google_properties (lines 481-483)
+    Expected: CREATE UNIQUE INDEX uidx_google_properties_place_current
+                  ON place_google_properties(place_id)
+                  WHERE is_current = true;
+    Actual:   MATCHES EXACTLY
+    Verdict:  PASS
+
+2.3 place_llm_properties (lines 486-488)
+    Expected: CREATE UNIQUE INDEX uidx_llm_properties_place_current
+                  ON place_llm_properties(place_id)
+                  WHERE is_current = true;
+    Actual:   MATCHES EXACTLY
+    Verdict:  PASS
+
+2.4 place_user_properties (lines 491-493)
+    Expected: CREATE UNIQUE INDEX uidx_user_properties_place_user_current
+                  ON place_user_properties(place_id, user_id)
+                  WHERE is_current = true;
+    Actual:   MATCHES EXACTLY
+    Verdict:  PASS
+
+================================================================================
+3. SEMANTIC CORRECTNESS
+================================================================================
+
+All constraints use partial unique indexes with WHERE is_current = true.
+This pattern ensures:
+- Multiple historical rows can coexist (is_current = false)
+- Only one row per scope can have is_current = true
+- PostgreSQL natively enforces the constraint
+- No application logic required
+
+User table correctly uses (place_id, user_id) composite key instead of
+just (place_id), allowing each user to have one current correction per place.
+
+================================================================================
+4. OVERALL VERDICT
+================================================================================
+
+ALL 4 ONE-CURRENT-ROW CONSTRAINTS PRESENT AND CORRECT
+No missing constraints. No incorrect definitions.
+
+================================================================================
+END OF EVIDENCE
+================================================================================

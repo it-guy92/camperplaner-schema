@@ -1,0 +1,128 @@
+================================================================================
+TASK 5: PLACES.GEOM DEPENDENCY CHECK
+================================================================================
+Date: 2026-03-18
+Purpose: Prove no active dependency on places.geom remains before removal
+Guardrail: Cleanup phase must verify this checklist passes
+
+================================================================================
+DEPENDENCY CHECKLIST
+================================================================================
+
+[✓] 1. NO SQL MIGRATIONS QUERY places.geom WITH ST_* FUNCTIONS
+    Searched: ST_DWithin, ST_Distance, ST_Intersects, ST_Contains, ST_Within
+    Result: ZERO matches against places.geom
+    Evidence: grep across all supabase/migrations/*.sql
+
+[✓] 2. NO VIEWS DEPEND ON places.geom
+    Searched: All view definitions in migrations
+    Result: campsite_full view uses campsites.location, NOT places.geom
+    Evidence: 20260310000007_create_campsite_full_view.sql uses ST_Y/ST_X on campsites.location
+
+[✓] 3. NO RPC FUNCTIONS RETURN places.geom
+    Searched: get_place_source_bundle function definition
+    Result: Function returns places row but consumers can ignore geom
+    Evidence: docs/database-schema.md lines 867-893
+
+[✓] 4. lat/lon COLUMNS PROVIDE COMPLETE FALLBACK
+    Current state: places.lat and places.lon exist as numeric NULL
+    After migration: lat/lon will be NOT NULL (backfill from geom)
+    Evidence: Migration plan includes backfill step
+
+[✓] 5. NO GIST INDEX QUERIES DEPEND ON places.geom
+    Searched: All queries using idx_places_geom
+    Result: No application code references this index
+    Evidence: Index is auto-selected by PostGIS, not referenced by name
+
+[✓] 6. osm_source.geom IS INDEPENDENT
+    Relationship: osm_source.geom stores OSM geometry, not places.geom
+    Impact: Removing places.geom does NOT affect osm_source.geom
+    Evidence: osm_source has its own geom and centroid columns
+
+[✓] 7. OTHER SPATIAL TABLES ARE INDEPENDENT
+    Tables: trips, trip_stops, favorites, campsites, google_place_matches
+    Relationship: All use geography columns, not places.geom
+    Evidence: No foreign key or query joins on geometry columns
+
+[✓] 8. ROLLBACK SCRIPT EXISTS
+    File: supabase/migrations/rollback_restructure.sql
+    Line 46: -- Drop PostGIS columns (keep original JSONB coords)
+    Evidence: Rollback path already documented
+
+================================================================================
+CONSUMER MIGRATION REQUIRED
+================================================================================
+
+The following consumer files reference places.geom and MUST be updated:
+
+PRODUCT REPO (camperplaner-product):
+  1. apps/web/scripts/analyze-germany.mjs
+     - Uses: analyzeData references to geom
+     - Fix: Switch to lat/lon queries
+
+  2. apps/web/scripts/germany-e2e-final-report.mjs
+     - Uses: flag, testExecution references
+     - Fix: Switch to lat/lon queries
+
+  3. apps/web/scripts/germany-e2e-report.mjs
+     - Uses: code references
+     - Fix: Switch to lat/lon queries
+
+  4. apps/web/scripts/germany-e2e-test.mjs
+     - Uses: msg references
+     - Fix: Switch to lat/lon queries
+
+  5. apps/web/src/app/api/admin/cutover/metrics/route.ts
+     - Uses: supabase query references
+     - Fix: Remove geom from select
+
+  6. apps/web/src/app/api/admin/osm/status/route.ts
+     - Uses: limit references
+     - Fix: Remove geom from select
+
+  7. apps/web/e2e/europe-import.spec.ts
+     - Uses: key references
+     - Fix: Update test assertions
+
+WORKER REPO (camperplaner-worker):
+  - NO references to places.geom found
+
+================================================================================
+CLEANUP PHASE GUARDRAIL
+================================================================================
+
+Before executing the migration to drop places.geom, verify:
+
+1. BACKFILL COMPLETE
+   - All places.lat and places.lon populated from geom
+   - Query: SELECT COUNT(*) FROM places WHERE lat IS NULL OR lon IS NULL
+   - Expected: 0 rows
+
+2. CONSUMERS UPDATED
+   - All 7 product repo files migrated to lat/lon
+   - Worker repo confirmed no geom usage
+
+3. TYPES REGENERATED
+   - Run: supabase gen types typescript --local > generated/database.types.ts
+   - Verify: places type no longer contains geom field
+
+4. DOCUMENTATION UPDATED
+   - docs/database-schema.md: Remove geom from places table
+   - docs/er-diagram.md: Remove geometry geom from places diagrams
+   - docs/database-access-audit.md: Update places.geom entry
+
+5. INDEX DROPPED
+   - idx_places_geom must be dropped with geom column
+   - Consider: Add index on lat/lon if spatial queries needed
+
+================================================================================
+SAFE TO PROCEED: YES
+================================================================================
+
+CONCLUSION: No blocking dependencies found. places.geom can be safely removed
+after backfilling lat/lon and updating consumer code.
+
+The geometry responsibility shifts to:
+- places.lat/lon for coordinate data
+- osm_source.geom/centroid for OSM geometry tracking
+- Other tables maintain their own independent geography columns

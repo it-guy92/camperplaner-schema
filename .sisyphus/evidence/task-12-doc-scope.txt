@@ -1,0 +1,213 @@
+# Task 12: Documentation Update Scope
+
+## Overview
+This file documents all documentation updates required for the place-properties migration across all three phases: additive, transition, and cleanup.
+
+---
+
+## Phase 1: Additive (New Tables) - Documentation Updates
+
+### 1. docs/database-schema.md
+
+#### New Section Required: Property Tables (Phase 1)
+
+Add new section after "Phase 1: Enrichment Schema":
+
+```
+### 7. Property Tables (Phase 1 - NEW)
+
+| Table | Description | Primary Key |
+|-------|-------------|-------------|
+| `place_osm_properties` | OSM-sourced property data | `id` (bigint) |
+| `place_google_properties` | Google Places property data | `id` (bigint) |
+| `place_llm_properties` | LLM-generated property data | `id` (bigint) |
+| `place_user_properties` | User-submitted corrections | `id` (bigint) |
+```
+
+#### Detailed Schema Entries Required:
+
+1. **place_osm_properties** - 60 columns total (55 shared + 5 source-specific)
+2. **place_google_properties** - 61 columns total (55 shared + 6 source-specific)
+3. **place_llm_properties** - 61 columns total (55 shared + 6 source-specific)
+4. **place_user_properties** - 56 columns total (55 shared + 1 source-specific)
+
+#### Shared Columns (55 per table):
+- Infrastructure (5): has_toilet, has_shower, has_electricity, has_water, has_wifi
+- Identity (5): name, place_type, source_place_type, source_categories, source_name
+- Address (7): country_code, region, city, postcode, address, lat, lon
+- Contact (5): website, phone, email, opening_hours, fee_info
+- Flags (8): pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed, has_dogs_allowed, has_beach, has_laundry, has_restaurant
+- Facilities (7): has_bar, has_shop, has_pool, has_playground, has_dump_station, has_washing_machine, has_dishwasher
+- Camping (8): price_info, price_per_night, price_type, currency, check_in_time, check_out_time, max_stay_days, booking_url
+- Disposal (6): has_waste_water_disposal, has_grey_water_disposal, has_black_water_disposal, waste_water_disposal_type, grey_water_disposal_type, black_water_disposal_type
+- Leisure (5): has_hiking, has_cycling, has_swimming, has_fishing, has_horse_riding
+- Nudism (2): is_clothing_optional, is_nudist_only
+- Attraction (5): has_scenery, has_wildlife, has_historical_site, has_local_culture, has_events
+
+#### Update Table Count:
+- Current: 45 tables
+- After Phase 1: 49 tables (+4)
+
+---
+
+### 2. docs/er-diagram.md
+
+#### Required Updates:
+
+1. **Full Schema Diagram Section** - Add four new property tables:
+   - place_osm_properties
+   - place_google_properties
+   - place_llm_properties
+   - place_user_properties
+
+2. **New Domain Diagram** - Property Tables Domain:
+```mermaid
+erDiagram
+    places {
+        bigint id PK
+        numeric lat
+        numeric lon
+        boolean is_active
+    }
+    
+    place_osm_properties {
+        bigint id PK
+        bigint place_id FK
+        bigint osm_source_id FK
+        boolean is_current
+        timestamptz source_updated_at
+        %% (55 shared columns + 5 OSM-specific)
+    }
+    
+    place_google_properties {
+        bigint id PK
+        bigint place_id FK
+        bigint google_source_id FK
+        boolean is_current
+        timestamptz source_updated_at
+        %% (55 shared columns + 6 Google-specific)
+    }
+    
+    place_llm_properties {
+        bigint id PK
+        bigint place_id FK
+        bigint llm_enrichment_id FK
+        boolean is_current
+        timestamptz source_updated_at
+        %% (55 shared columns + 6 LLM-specific)
+    }
+    
+    place_user_properties {
+        bigint id PK
+        bigint place_id FK
+        uuid user_id FK
+        boolean is_current
+        timestamptz source_updated_at
+        %% (55 shared columns + 1 user-specific)
+    }
+    
+    places ||--o{ place_osm_properties : "has_current"
+    places ||--o{ place_google_properties : "has_current"
+    places ||--o{ place_llm_properties : "has_current"
+    places ||--o{ place_user_properties : "has_current"
+```
+
+3. **Key Relationships Summary** - Add new rows:
+| places | place_osm_properties | place_id | OSM properties |
+| places | place_google_properties | place_id | Google properties |
+| places | place_llm_properties | place_id | LLM properties |
+| places | place_user_properties | place_id | User properties |
+
+---
+
+### 3. docs/database-access-audit.md
+
+#### Required Updates:
+- Add RLS policies for all four property tables
+- Document read/write access patterns for each source type
+
+---
+
+## Phase 2: Transition (Views/RPC) - Documentation Updates
+
+### 1. docs/database-schema.md
+
+#### Update Existing Sections:
+
+1. **Views Section** - Update `campsite_full`:
+   - Document new JOIN-based implementation
+   - Note: Now reads from property tables instead of places
+   - Add cross-source resolution priority explanation
+
+2. **RPC Functions Section** - Update `get_place_source_bundle`:
+   - Document new return structure
+   - Note: Now includes property table data
+
+3. **Foreign Key Relationships** - Add:
+```
+places (id)
+  ├── place_osm_properties (place_id)
+  ├── place_google_properties (place_id)
+  ├── place_llm_properties (place_id)
+  └── place_user_properties (place_id)
+```
+
+---
+
+## Phase 3: Cleanup (Drop Deprecated) - Documentation Updates
+
+### 1. docs/database-schema.md
+
+#### Mark Deprecated Columns/Features:
+
+1. **Update places table schema** - Document removed columns:
+   - Remove: geom, source_primary, data_confidence
+   - Remove: has_toilet, has_shower, has_electricity, has_water, has_wifi
+   - Remove: pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed
+   - Remove: website, phone, email, opening_hours, fee_info
+   - Remove: name, place_type, city, region, postcode, address
+   - Remove: has_bar, has_shop, has_pool, has_playground
+   - Remove: has_dump_station, has_washing_machine, has_dishwasher
+   - Remove: has_beach, has_laundry, has_restaurant
+   - Remove: last_seen_at, last_enriched_at
+
+2. **Add Deprecation Notice Section**:
+```
+## Deprecated Elements (Phase 3)
+
+The following elements are deprecated and will be removed in Phase 3:
+
+| Element | Type | Deprecated Since | Target Removal |
+|---------|------|------------------|----------------|
+| places.geom | column | Phase 1 | Phase 3 |
+| places.source_primary | column | Phase 1 | Phase 3 |
+| places.(20 business columns) | columns | Phase 1 | Phase 3 |
+| campsite_full (legacy) | view | Phase 2 | Phase 3 |
+| get_place_source_bundle (legacy) | function | Phase 2 | Phase 3 |
+```
+
+---
+
+## Documentation Update Timing
+
+### MUST NOT DO:
+- Do NOT describe dropped tables as "current" once Phase 1 lands
+- Do NOT leave docs updates until after Phase 3 cleanup
+- Do NOT mark deprecated elements as removed until cleanup executes
+
+### MUST DO:
+- Update docs during Phase 1 (additive) to show new tables
+- Update docs during Phase 2 (transition) to show deprecation
+- Update docs during Phase 3 (cleanup) to mark removed
+
+---
+
+## Migration Reference
+
+- **Phase 1 Migration**: Creates 4 new property tables (additive, safe to rollback)
+- **Phase 2 Migration**: Rewrites views/RPC, updates generated types (non-breaking)
+- **Phase 3 Migration**: Drops deprecated columns (DESTRUCTIVE - requires evidence gate)
+
+---
+
+Last Updated: 2026-03-18

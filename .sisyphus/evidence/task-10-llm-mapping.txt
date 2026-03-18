@@ -1,0 +1,476 @@
+# Task 10: LLM Backfill Mapping — place_llm_enrichments + children → place_llm_properties
+# Generated: 2026-03-18
+# Purpose: Deterministic batched backfill design for LLM property table
+
+================================================================================
+SECTION 1: SOURCE TABLES OVERVIEW
+================================================================================
+
+Source family: place_llm_enrichments (parent) + 3 child tables
+
+| Source Table                  | Rows per Place | Role                              |
+|-------------------------------|----------------|-----------------------------------|
+| place_llm_enrichments         | 1..N           | Parent; provider/model/summary    |
+| place_llm_facts               | 0..N           | Pivoted field_name→value pairs    |
+| place_llm_sources             | 0..N           | Source URLs cited by LLM          |
+| place_llm_evidence_markers    | 0..N           | DISCARD — process data only       |
+
+Target: place_llm_properties (1 row per current enrichment per place)
+
+================================================================================
+SECTION 2: COLUMN-BY-COLUMN MAPPING
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1 INFRASTRUCTURE / ROW IDENTITY
+--------------------------------------------------------------------------------
+
+| Target Column       | Source                    | Transform Rule                         | Notes                          |
+|---------------------|---------------------------|----------------------------------------|--------------------------------|
+| id                  | (auto)                    | bigserial PK — generated on INSERT     | New surrogate key              |
+| place_id            | place_llm_enrichments     | Direct: place_id                       | FK to places.id                |
+| is_current          | place_llm_enrichments     | Direct: is_current                     | Current-row semantics          |
+| created_at          | place_llm_enrichments     | Direct: created_at                     | Preserve original timestamp    |
+| updated_at          | place_llm_enrichments     | Direct: updated_at                     | Preserve original timestamp    |
+| source_updated_at   | place_llm_enrichments     | COALESCE(completed_at, started_at)     | Last LLM processing time       |
+
+--------------------------------------------------------------------------------
+2.2 IDENTITY / CONTENT (from place_llm_facts WHERE field_name = ...)
+--------------------------------------------------------------------------------
+
+| Target Column        | field_name match   | Value Parse Rule                         | Notes                          |
+|----------------------|--------------------|------------------------------------------|--------------------------------|
+| name                 | 'name'             | value_text AS text                       | LLM may correct place name     |
+| description          | 'description'      | value_text AS text                       | LLM-generated description      |
+| place_type           | 'place_type'       | value_text AS text                       | LLM-classified type            |
+| source_place_type    | (not from facts)    | NULL                                     | LLM doesn't provide OSM-style  |
+| source_categories    | (not from facts)    | NULL                                     | LLM doesn't provide categories |
+
+--------------------------------------------------------------------------------
+2.3 ADDRESS / LOCATION (from place_llm_facts WHERE field_name = ...)
+--------------------------------------------------------------------------------
+
+| Target Column    | field_name match   | Value Parse Rule                         | Notes                          |
+|------------------|--------------------|------------------------------------------|--------------------------------|
+| country_code     | 'country_code'     | value_text AS text                       | If LLM extracted country       |
+| region           | 'region'           | value_text AS text                       | If LLM extracted region        |
+| city             | 'city'             | value_text AS text                       | If LLM extracted city          |
+| postcode         | 'postcode'         | value_text AS text                       | If LLM extracted postcode      |
+| address          | 'address'          | value_text AS text                       | If LLM extracted address       |
+| source_lat       | (not from facts)   | NULL                                     | LLM doesn't provide coords     |
+| source_lon       | (not from facts)   | NULL                                     | LLM doesn't provide coords     |
+
+--------------------------------------------------------------------------------
+2.4 CONTACT / OPERATIONS (from place_llm_facts WHERE field_name = ...)
+--------------------------------------------------------------------------------
+
+| Target Column    | field_name match   | Value Parse Rule                         | Notes                          |
+|------------------|--------------------|------------------------------------------|--------------------------------|
+| website          | 'website'          | value_text AS text                       | LLM-discovered website         |
+| phone            | 'phone'            | value_text AS text                       | LLM-discovered phone           |
+| email            | 'email'            | value_text AS text                       | LLM-discovered email           |
+| opening_hours    | 'opening_hours'    | value_text AS text                       | LLM-extracted hours            |
+| fee_info         | 'fee_info'         | value_text AS text                       | LLM-extracted fee info         |
+
+--------------------------------------------------------------------------------
+2.5 GENERIC FLAGS (from place_llm_facts WHERE field_name = ..., parse boolean)
+--------------------------------------------------------------------------------
+
+Parse rule for all booleans:
+  CASE WHEN value_text IN ('true', '1', 'yes') THEN true
+       WHEN value_text IN ('false', '0', 'no') THEN false
+       ELSE NULL END
+
+| Target Column           | field_name match        | Notes                          |
+|-------------------------|-------------------------|--------------------------------|
+| wheelchair_accessible   | 'wheelchair_accessible' | If LLM extracted               |
+| family_friendly         | 'family_friendly'       | If LLM extracted               |
+| pets_allowed            | 'pet_friendly'          | Name mismatch: source=pet_friendly → target=pets_allowed |
+| indoor                  | 'indoor'                | If LLM extracted               |
+| outdoor                 | 'outdoor'               | If LLM extracted               |
+| entry_fee_required      | 'entry_fee_required'    | If LLM extracted               |
+| reservation_required    | 'reservation_required'  | If LLM extracted               |
+| overnight_stay_allowed  | 'overnight_stay_allowed'| If LLM extracted               |
+
+--------------------------------------------------------------------------------
+2.6 GENERAL FACILITIES (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column        | field_name match     | Notes                          |
+|----------------------|----------------------|--------------------------------|
+| has_parking          | 'has_parking'        |                                |
+| has_restrooms        | 'has_restrooms'      |                                |
+| has_drinking_water   | 'has_drinking_water' |                                |
+| has_wifi             | 'has_wifi'           |                                |
+| has_shop             | 'has_shop'           |                                |
+| has_restaurant       | 'has_restaurant'     |                                |
+| has_cafe             | 'has_cafe'           |                                |
+
+--------------------------------------------------------------------------------
+2.7 CAMPING PERMISSIONS (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column        | field_name match     | Notes                          |
+|----------------------|----------------------|--------------------------------|
+| caravan_allowed      | 'caravan_allowed'    |                                |
+| motorhome_allowed    | 'motorhome_allowed'  |                                |
+| tent_allowed         | 'tent_allowed'       |                                |
+
+--------------------------------------------------------------------------------
+2.8 CAMPING FACILITIES (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column          | field_name match       | Notes                          |
+|------------------------|------------------------|--------------------------------|
+| has_electricity        | 'has_electricity'      |                                |
+| has_fresh_water        | 'has_fresh_water'      |                                |
+| has_shower             | 'has_shower'           |                                |
+| has_laundry            | 'has_laundry'          |                                |
+| has_dishwashing_area   | 'has_dishwashing_area' |                                |
+
+--------------------------------------------------------------------------------
+2.9 DISPOSAL / UTILITIES (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column                  | field_name match               | Notes                          |
+|--------------------------------|--------------------------------|--------------------------------|
+| has_grey_water_disposal        | 'has_grey_water_disposal'      |                                |
+| has_black_water_disposal       | 'has_black_water_disposal'     |                                |
+| has_chemical_toilet_disposal   | 'has_chemical_toilet_disposal' |                                |
+| has_dump_station               | 'has_dump_station'             |                                |
+| has_waste_disposal             | 'has_waste_disposal'           |                                |
+| has_recycling                  | 'has_recycling'                |                                |
+
+--------------------------------------------------------------------------------
+2.10 LEISURE (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column    | field_name match | Notes                          |
+|------------------|------------------|--------------------------------|
+| has_bbq_area     | 'has_bbq_area'   |                                |
+| has_fire_pit     | 'has_fire_pit'   |                                |
+| has_playground   | 'has_playground' |                                |
+| has_pool         | 'has_pool'       |                                |
+| has_beach        | 'has_beach'      |                                |
+
+--------------------------------------------------------------------------------
+2.11 NUDISM (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column    | field_name match | Notes                          |
+|------------------|------------------|--------------------------------|
+| nudism_allowed   | 'nudism_allowed' |                                |
+| nudism_only      | 'nudism_only'    |                                |
+
+--------------------------------------------------------------------------------
+2.12 ATTRACTION / MUSEUM (from place_llm_facts, parse boolean)
+--------------------------------------------------------------------------------
+
+| Target Column          | field_name match       | Notes                          |
+|------------------------|------------------------|--------------------------------|
+| has_guided_tours       | 'has_guided_tours'     |                                |
+| has_audio_guide        | 'has_audio_guide'      |                                |
+| has_visitor_center     | 'has_visitor_center'   |                                |
+| has_lockers            | 'has_lockers'          |                                |
+| photography_allowed    | 'photography_allowed'  |                                |
+
+--------------------------------------------------------------------------------
+2.13 LLM-SPECIFIC COLUMNS
+--------------------------------------------------------------------------------
+
+| Target Column       | Source                    | Transform Rule                              | Notes                          |
+|---------------------|---------------------------|---------------------------------------------|--------------------------------|
+| llm_enrichment_id   | place_llm_enrichments.id  | Direct: id                                  | FK back to source row          |
+| provider            | place_llm_enrichments     | Direct: provider                            | e.g., 'openai', 'anthropic'    |
+| model               | place_llm_enrichments     | Direct: model                               | e.g., 'gpt-4', 'claude-3'      |
+| summary_de          | place_llm_enrichments     | Direct: summary_de                          | German summary                 |
+| trust_score         | place_llm_enrichments     | confidence * (1 - COALESCE(hallucination_risk, 0)) | Derived trust score (0-1) |
+| source_urls         | place_llm_sources         | JSONB array_agg(source_url ORDER BY relevance_score DESC NULLS LAST, id) | Aggregated URLs |
+
+================================================================================
+SECTION 3: TRUST SCORE DERIVATION
+================================================================================
+
+Formula:
+  trust_score = confidence * (1 - COALESCE(hallucination_risk, 0))
+
+Rationale:
+- confidence (0-1): How confident the LLM is in its output
+- hallucination_risk (0-1): Risk of fabricated information
+- Combined: High confidence + low hallucination risk = high trust
+- Range: 0.0 (no trust) to 1.0 (full trust)
+
+Edge cases:
+- If confidence IS NULL → trust_score = NULL
+- If hallucination_risk IS NULL → treat as 0 (no penalty)
+- If both NULL → trust_score = NULL
+
+SQL expression:
+  CASE WHEN ple.confidence IS NOT NULL
+       THEN ple.confidence * (1 - COALESCE(ple.hallucination_risk, 0))
+       ELSE NULL
+  END AS trust_score
+
+================================================================================
+SECTION 4: SOURCE URLS AGGREGATION
+================================================================================
+
+All source URLs from place_llm_sources for the enrichment are aggregated into
+a JSONB text array stored in source_urls.
+
+Aggregation logic:
+  SELECT jsonb_agg(source_url ORDER BY relevance_score DESC NULLS LAST, id)
+  FROM place_llm_sources
+  WHERE llm_enrichment_id = <enrichment_id>
+
+Ordering rationale:
+- relevance_score DESC: Most relevant URLs first
+- NULLS LAST: URLs without relevance score come after scored ones
+- id ASC: Stable ordering for ties
+
+Edge cases:
+- No sources → source_urls = NULL (not empty array)
+- Single source → single-element array
+- Duplicate URLs → preserved as-is (deduplication is application concern)
+
+================================================================================
+SECTION 5: FACTS PIVOT STRATEGY
+================================================================================
+
+place_llm_facts stores facts as rows (field_name, value_text, value_type).
+place_llm_properties stores facts as columns.
+
+Pivot approach:
+1. For each enrichment, collect all facts into a JSONB object:
+   SELECT jsonb_object_agg(field_name, value_text)
+   FROM place_llm_facts
+   WHERE llm_enrichment_id = <enrichment_id>
+
+2. In the INSERT, use COALESCE to extract each field:
+   COALESCE(facts->>'name', NULL) AS name
+   COALESCE(facts->>'has_electricity', NULL)::boolean AS has_electricity
+
+3. Boolean parsing for value_type='boolean':
+   CASE WHEN facts->>'has_electricity' IN ('true','1','yes') THEN true
+        WHEN facts->>'has_electricity' IN ('false','0','no') THEN false
+        ELSE NULL END
+
+Alternative (simpler for batch):
+  Use subquery per column:
+  (SELECT value_text FROM place_llm_facts
+   WHERE llm_enrichment_id = ple.id AND field_name = 'has_electricity'
+   LIMIT 1) AS raw_has_electricity
+
+Recommended: JSONB aggregation approach for single-pass efficiency.
+
+================================================================================
+SECTION 6: BATCH INSERT TEMPLATE
+================================================================================
+
+```sql
+INSERT INTO place_llm_properties (
+    place_id, is_current, created_at, updated_at, source_updated_at,
+    name, description, place_type,
+    country_code, region, city, postcode, address,
+    website, phone, email, opening_hours, fee_info,
+    wheelchair_accessible, family_friendly, pets_allowed, indoor, outdoor,
+    entry_fee_required, reservation_required, overnight_stay_allowed,
+    has_parking, has_restrooms, has_drinking_water, has_wifi, has_shop,
+    has_restaurant, has_cafe,
+    caravan_allowed, motorhome_allowed, tent_allowed,
+    has_electricity, has_fresh_water, has_shower, has_laundry, has_dishwashing_area,
+    has_grey_water_disposal, has_black_water_disposal, has_chemical_toilet_disposal,
+    has_dump_station, has_waste_disposal, has_recycling,
+    has_bbq_area, has_fire_pit, has_playground, has_pool, has_beach,
+    nudism_allowed, nudism_only,
+    has_guided_tours, has_audio_guide, has_visitor_center, has_lockers, photography_allowed,
+    llm_enrichment_id, provider, model, summary_de, trust_score, source_urls
+)
+SELECT
+    ple.place_id,
+    ple.is_current,
+    ple.created_at,
+    ple.updated_at,
+    COALESCE(ple.completed_at, ple.started_at) AS source_updated_at,
+
+    -- Facts pivot (JSONB aggregation subquery)
+    facts->>'name' AS name,
+    facts->>'description' AS description,
+    facts->>'place_type' AS place_type,
+
+    facts->>'country_code' AS country_code,
+    facts->>'region' AS region,
+    facts->>'city' AS city,
+    facts->>'postcode' AS postcode,
+    facts->>'address' AS address,
+
+    facts->>'website' AS website,
+    facts->>'phone' AS phone,
+    facts->>'email' AS email,
+    facts->>'opening_hours' AS opening_hours,
+    facts->>'fee_info' AS fee_info,
+
+    -- Boolean fields (parse from text)
+    parse_bool(facts->>'wheelchair_accessible') AS wheelchair_accessible,
+    parse_bool(facts->>'family_friendly') AS family_friendly,
+    parse_bool(facts->>'pet_friendly') AS pets_allowed,  -- NAME MISMATCH
+    parse_bool(facts->>'indoor') AS indoor,
+    parse_bool(facts->>'outdoor') AS outdoor,
+    parse_bool(facts->>'entry_fee_required') AS entry_fee_required,
+    parse_bool(facts->>'reservation_required') AS reservation_required,
+    parse_bool(facts->>'overnight_stay_allowed') AS overnight_stay_allowed,
+
+    parse_bool(facts->>'has_parking') AS has_parking,
+    parse_bool(facts->>'has_restrooms') AS has_restrooms,
+    parse_bool(facts->>'has_drinking_water') AS has_drinking_water,
+    parse_bool(facts->>'has_wifi') AS has_wifi,
+    parse_bool(facts->>'has_shop') AS has_shop,
+    parse_bool(facts->>'has_restaurant') AS has_restaurant,
+    parse_bool(facts->>'has_cafe') AS has_cafe,
+
+    parse_bool(facts->>'caravan_allowed') AS caravan_allowed,
+    parse_bool(facts->>'motorhome_allowed') AS motorhome_allowed,
+    parse_bool(facts->>'tent_allowed') AS tent_allowed,
+
+    parse_bool(facts->>'has_electricity') AS has_electricity,
+    parse_bool(facts->>'has_fresh_water') AS has_fresh_water,
+    parse_bool(facts->>'has_shower') AS has_shower,
+    parse_bool(facts->>'has_laundry') AS has_laundry,
+    parse_bool(facts->>'has_dishwashing_area') AS has_dishwashing_area,
+
+    parse_bool(facts->>'has_grey_water_disposal') AS has_grey_water_disposal,
+    parse_bool(facts->>'has_black_water_disposal') AS has_black_water_disposal,
+    parse_bool(facts->>'has_chemical_toilet_disposal') AS has_chemical_toilet_disposal,
+    parse_bool(facts->>'has_dump_station') AS has_dump_station,
+    parse_bool(facts->>'has_waste_disposal') AS has_waste_disposal,
+    parse_bool(facts->>'has_recycling') AS has_recycling,
+
+    parse_bool(facts->>'has_bbq_area') AS has_bbq_area,
+    parse_bool(facts->>'has_fire_pit') AS has_fire_pit,
+    parse_bool(facts->>'has_playground') AS has_playground,
+    parse_bool(facts->>'has_pool') AS has_pool,
+    parse_bool(facts->>'has_beach') AS has_beach,
+
+    parse_bool(facts->>'nudism_allowed') AS nudism_allowed,
+    parse_bool(facts->>'nudism_only') AS nudism_only,
+
+    parse_bool(facts->>'has_guided_tours') AS has_guided_tours,
+    parse_bool(facts->>'has_audio_guide') AS has_audio_guide,
+    parse_bool(facts->>'has_visitor_center') AS has_visitor_center,
+    parse_bool(facts->>'has_lockers') AS has_lockers,
+    parse_bool(facts->>'photography_allowed') AS photography_allowed,
+
+    -- LLM-specific
+    ple.id AS llm_enrichment_id,
+    ple.provider,
+    ple.model,
+    ple.summary_de,
+    CASE WHEN ple.confidence IS NOT NULL
+         THEN ple.confidence * (1 - COALESCE(ple.hallucination_risk, 0))
+         ELSE NULL
+    END AS trust_score,
+    src.urls AS source_urls
+
+FROM place_llm_enrichments ple
+
+-- Facts pivot: aggregate all facts into single JSONB object per enrichment
+LEFT JOIN LATERAL (
+    SELECT jsonb_object_agg(field_name, value_text) AS facts
+    FROM place_llm_facts
+    WHERE llm_enrichment_id = ple.id
+) f ON true
+
+-- Source URLs: aggregate into JSONB array
+LEFT JOIN LATERAL (
+    SELECT jsonb_agg(source_url ORDER BY relevance_score DESC NULLS LAST, id) AS urls
+    FROM place_llm_sources
+    WHERE llm_enrichment_id = ple.id
+) src ON true
+
+-- Only backfill completed enrichments
+WHERE ple.status = 'completed';
+```
+
+Helper function (create if not exists):
+```sql
+CREATE OR REPLACE FUNCTION parse_bool(text)
+RETURNS boolean AS $$
+BEGIN
+    RETURN CASE
+        WHEN $1 IN ('true', '1', 'yes', 'TRUE', 'Yes') THEN true
+        WHEN $1 IN ('false', '0', 'no', 'FALSE', 'No') THEN false
+        ELSE NULL
+    END;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+```
+
+================================================================================
+SECTION 7: FIELD NAME MISMATCHES (source → target)
+================================================================================
+
+| Source field_name    | Target Column        | Action Required                      |
+|----------------------|----------------------|--------------------------------------|
+| pet_friendly         | pets_allowed         | Rename during pivot                  |
+| has_water            | has_drinking_water   | Rename during pivot                  |
+| has_toilet           | has_restrooms        | Rename during pivot (semantic match) |
+
+These mismatches exist because place_llm_facts uses the old places column names
+while place_llm_properties uses the new aligned naming convention.
+
+================================================================================
+SECTION 8: DATA NOT MIGRATED (DISCARD)
+================================================================================
+
+| Source Table                  | Column              | Reason                              |
+|-------------------------------|---------------------|-------------------------------------|
+| place_llm_enrichments         | job_id              | Operational metadata                |
+| place_llm_enrichments         | prompt_version      | Process data                        |
+| place_llm_enrichments         | token_input         | Cost tracking (not place property)  |
+| place_llm_enrichments         | token_output        | Cost tracking (not place property)  |
+| place_llm_enrichments         | cost_usd            | Cost tracking (not place property)  |
+| place_llm_enrichments         | status              | Process status                      |
+| place_llm_enrichments         | started_at          | Process timing (→ source_updated_at)|
+| place_llm_enrichments         | completed_at        | Process timing (→ source_updated_at)|
+| place_llm_enrichments         | created_by          | Audit field                         |
+| place_llm_facts               | value_type          | Implicit in target column type      |
+| place_llm_facts               | confidence          | Aggregated into trust_score         |
+| place_llm_facts               | provenance_kind     | Process metadata                    |
+| place_llm_sources             | source_domain       | Derivable from source_url           |
+| place_llm_sources             | source_kind         | Classification discarded            |
+| place_llm_sources             | trusted             | Aggregated into trust_score         |
+| place_llm_sources             | relevance_score     | Used for ordering only              |
+| place_llm_sources             | fetched_at          | Process timing                      |
+| place_llm_evidence_markers    | ALL COLUMNS         | Process data — table DISCARDED      |
+
+================================================================================
+SECTION 9: VERIFICATION CHECKLIST
+================================================================================
+
+After backfill, verify:
+
+1. Row count: COUNT(*) FROM place_llm_properties = COUNT(*) FROM place_llm_enrichments WHERE status = 'completed'
+2. Current rows: COUNT(*) FROM place_llm_properties WHERE is_current = true = COUNT(*) FROM place_llm_enrichments WHERE is_current = true AND status = 'completed'
+3. No NULL place_id: All rows have valid place_id FK
+4. Trust score range: All trust_score values BETWEEN 0 AND 1 (or NULL)
+5. Source URLs format: All source_urls are valid JSONB arrays or NULL
+6. Provider/model populated: No NULLs in provider or model columns
+7. Unique current constraint: uidx_llm_properties_place_current not violated
+
+================================================================================
+SECTION 10: SUMMARY
+================================================================================
+
+Total source columns mapped: 6 direct + 45+ from facts pivot + 1 aggregated
+Total source columns discarded: 17 (operational/process metadata)
+Total source tables: 4 (1 parent + 3 children, 1 child discarded)
+Target table: place_llm_properties (1 row per enrichment)
+
+Key transformations:
+- Facts pivot: Rows → Columns via JSONB aggregation
+- Trust derivation: confidence * (1 - hallucination_risk)
+- URL aggregation: Multiple rows → JSONB array
+- Boolean parsing: Text → boolean with edge case handling
+- Field renaming: 3 name mismatches resolved
+
+Deterministic: Every source field has a target, discard rationale, or archive decision.

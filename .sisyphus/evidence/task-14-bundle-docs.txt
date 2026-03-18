@@ -1,0 +1,201 @@
+# TASK 14: Documentation Alignment for Source Bundle RPC
+# Generated: 2026-03-18
+# Purpose: Document how docs/database-schema.md must be updated to match new RPC contract
+
+## CURRENT DOCUMENTATION (docs/database-schema.md)
+
+### RPC Section (Lines 867-893)
+
+Current documented contract:
+```
+get_place_source_bundle(bigint) → jsonb
+
+Returns JSONB with keys:
+- base: { /* places table row */ }
+- osm: { /* current osm_source row or null */ }
+- llm: { /* current place_llm_enrichments row or null */ }
+- google: { /* current place_google_sources row or null */ }
+- user_aggregates: { review_count, avg_rating, favorite_count }
+```
+
+### Problems:
+1. Documents `base` as "places table row" — implies all columns (deprecated)
+2. Documents `osm` as osm_source — raw import data, not aligned properties
+3. Documents `llm` as place_llm_enrichments — processing metadata, not facts
+4. Documents `google` as place_google_sources — API cache, not aligned properties
+5. Missing: user_properties, google_reviews, google_photos
+6. Missing: Property tables (place_osm_properties, etc.) not referenced
+
+---
+
+## REQUIRED DOCUMENTATION UPDATES
+
+### 1. RPC Section (Lines 867-893)
+
+Replace with:
+
+```markdown
+### `get_place_source_bundle(bigint)` → jsonb
+
+Returns a complete source bundle for a place by its bigint id.
+
+**Parameters:**
+- `place_id` (bigint): The place ID from the `places` table
+
+**Returns:** JSONB object with structure:
+```json
+{
+  "base": {
+    "id": 12345,
+    "lat": 48.123456,
+    "lon": 11.654321,
+    "is_active": true,
+    "created_at": "2026-01-01T00:00:00Z",
+    "updated_at": "2026-03-18T00:00:00Z"
+  },
+  "osm_properties": { /* current place_osm_properties row or null */ },
+  "google_properties": { /* current place_google_properties row or null */ },
+  "llm_properties": { /* current place_llm_properties row or null */ },
+  "user_properties": { /* current place_user_properties row or null */ },
+  "google_reviews": [ /* array of place_google_reviews or empty */ ],
+  "google_photos": [ /* array of place_google_photos or empty */ ],
+  "user_aggregates": {
+    "review_count": 0,
+    "avg_rating": null,
+    "favorite_count": 0
+  }
+}
+```
+
+**Behavior:**
+- Returns `NULL` if place_id does not exist
+- Only includes current (is_current = true) property records
+- `base` contains minimal place data (6 columns only)
+- `google_reviews` and `google_photos` linked via `google_source_id`
+- User aggregates computed from `campsite_reviews` and `favorites`
+
+**Resolution Priority:**
+When resolving property values from the bundle:
+1. `user_properties` (if non-NULL) — human corrections, highest priority
+2. `osm_properties` (if non-NULL) — community-verified data
+3. `google_properties` (if non-NULL) — commercial source
+4. `llm_properties` (if non-NULL) — AI-generated, lowest priority
+```
+
+### 2. Property Tables Section (Lines 75-108)
+
+Add new section after "Phase 1: Enrichment Schema":
+
+```markdown
+### 6. Phase 2: Property Tables (NEW)
+
+#### Aligned Property Tables
+
+| Table | Description | Primary Key | Source-Specific Columns |
+|-------|-------------|-------------|------------------------|
+| `place_osm_properties` | OSM property data (aligned) | `id` (bigint) | osm_source_id, osm_id, osm_type, osm_version, osm_timestamp |
+| `place_google_properties` | Google property data (aligned) | `id` (bigint) | google_source_id, google_place_id, rating, review_count, business_status, expires_at |
+| `place_llm_properties` | LLM property data (aligned) | `id` (bigint) | llm_enrichment_id, provider, model, summary_de, trust_score, source_urls |
+| `place_user_properties` | User property data (aligned) | `id` (bigint) | user_id |
+
+All four tables share 55 identical columns for cross-source resolution.
+Boolean columns default to NULL (no-claim semantics).
+Current-row semantics enforced via partial unique indexes.
+```
+
+### 3. Schema Design Patterns (Lines 947-989)
+
+Add new pattern:
+
+```markdown
+### Property Table Pattern
+Phase 2 introduces aligned property tables that replace source-family parent tables.
+
+**Key Differences from Source Families:**
+- Source families: Raw import data (osm_source, place_google_sources, place_llm_enrichments)
+- Property tables: Aligned business data with 55 shared columns
+
+**Read Resolution:**
+```sql
+SELECT COALESCE(
+  user.column_name,
+  osm.column_name,
+  google.column_name,
+  llm.column_name
+) AS resolved_value
+FROM places p
+LEFT JOIN place_user_properties user ON user.place_id = p.id AND user.is_current = true
+LEFT JOIN place_osm_properties osm ON osm.place_id = p.id AND osm.is_current = true
+LEFT JOIN place_google_properties google ON google.place_id = p.id AND google.is_current = true
+LEFT JOIN place_llm_properties llm ON llm.place_id = p.id AND llm.is_current = true
+WHERE p.id = $1;
+```
+
+**Current-Row Semantics:**
+- OSM/Google/LLM: One current row per place_id
+- User: One current row per (place_id, user_id)
+- Enforced via partial unique indexes: `WHERE is_current = true`
+```
+
+### 4. Foreign Key Relationships (Lines 897-943)
+
+Add property table relationships:
+
+```markdown
+### Property Table Relationships
+
+```
+places (id)
+  ├── place_osm_properties (place_id)
+  ├── place_google_properties (place_id)
+  ├── place_llm_properties (place_id)
+  └── place_user_properties (place_id)
+
+place_google_properties (google_source_id)
+  └── place_google_sources (id)
+      ├── place_google_reviews (google_source_id)
+      └── place_google_photos (google_source_id)
+
+place_llm_properties (llm_enrichment_id)
+  └── place_llm_enrichments (id)
+
+place_user_properties (user_id)
+  └── profiles (id)
+```
+```
+
+---
+
+## DOCUMENTATION vs CONTRACT AGREEMENT
+
+| Contract Key | Documentation Reference | Status |
+|--------------|------------------------|--------|
+| base | RPC section, line 876 | NEEDS UPDATE: "places table row" → "minimal places (6 columns)" |
+| osm_properties | NOT DOCUMENTED | MISSING: Must add as new key |
+| google_properties | NOT DOCUMENTED | MISSING: Must add as new key |
+| llm_properties | NOT DOCUMENTED | MISSING: Must add as new key |
+| user_properties | NOT DOCUMENTED | MISSING: Must add as new key |
+| google_reviews | NOT DOCUMENTED | MISSING: Must add as new key |
+| google_photos | NOT DOCUMENTED | MISSING: Must add as new key |
+| user_aggregates | RPC section, line 881 | OK: Unchanged |
+
+---
+
+## VERIFICATION
+
+After documentation updates, verify:
+1. RPC section lists all 8 keys (base, osm_properties, google_properties, llm_properties, user_properties, google_reviews, google_photos, user_aggregates)
+2. Property tables section documents all 4 tables with shared column count
+3. Schema patterns section includes resolution priority and current-row semantics
+4. FK relationships include property table join paths
+5. No references to deprecated keys (osm, llm, google as source tables)
+
+---
+
+Evidence: This file documents the alignment between the new RPC contract and database-schema.md.
+Source files:
+- docs/database-schema.md (lines 867-893: RPC section)
+- docs/database-schema.md (lines 75-108: Table domains)
+- docs/database-schema.md (lines 947-989: Schema patterns)
+- docs/database-schema.md (lines 897-943: FK relationships)
+- .sisyphus/evidence/task-14-bundle-contract.txt (new RPC contract)

@@ -1,0 +1,201 @@
+================================================================================
+TASK 15: PLACES TABLE CLEANUP - VALIDATION GATES
+================================================================================
+Date: 2026-03-18
+Purpose: Define validation gates that must pass before places cleanup proceeds
+Scope: Pre-cleanup gates, post-cleanup verification, blocking conditions
+
+================================================================================
+1. PREREQUISITE GATES (ALL MUST PASS)
+================================================================================
+
+Gate 1: campsite_full View Cutover Verified
+  Status: REQUIRED
+  Evidence: Consumer queries return data from source tables, not places columns
+  Verification:
+    [ ] SELECT on campsite_full returns expected columns
+    [ ] No references to deprecated places columns in view definition
+    [ ] Product repo tests pass with new view
+  Blocking: YES - Cannot proceed without this gate
+
+Gate 2: get_place_source_bundle RPC Cutover Verified
+  Status: REQUIRED
+  Evidence: RPC returns complete source bundle without places business columns
+  Verification:
+    [ ] RPC returns base, osm, llm, google, user_aggregates
+    [ ] No business columns from places in base section
+    [ ] Worker repo tests pass with new RPC signature
+  Blocking: YES - Cannot proceed without this gate
+
+Gate 3: Rollback Readiness Confirmed
+  Status: REQUIRED
+  Evidence: Rollback plan documented and tested
+  Verification:
+    [ ] Rollback SQL script exists and is valid
+    [ ] Backup of places table taken before cleanup
+    [ ] Rollback tested in staging environment
+  Blocking: YES - Cannot proceed without this gate
+
+Gate 4: Geometry Audit Complete (Task 5)
+  Status: DONE
+  Evidence: task-5-geometry-audit.txt
+  Verification:
+    [x] No ST_* functions query places.geom
+    [x] No views depend on places.geom
+    [x] No RPC functions return places.geom
+    [x] lat/lon columns provide complete fallback
+    [x] 7 product repo files identified for update
+  Blocking: NO - Audit complete, safe to proceed
+
+Gate 5: Consumer Notification Sent
+  Status: REQUIRED
+  Evidence: Product and worker repos notified of cleanup
+  Verification:
+    [ ] Issue created in product repo
+    [ ] Issue created in worker repo
+    [ ] Cleanup timeline communicated
+  Blocking: YES - Cannot proceed without notification
+
+================================================================================
+2. PRE-CLEANUP EVIDENCE GATES
+================================================================================
+
+Gate 6: Row Count Snapshot
+  Status: REQUIRED
+  Evidence: Pre-cleanup row counts documented
+  Verification:
+    [ ] places table row count recorded
+    [ ] Related tables row counts recorded (osm_source, place_google_sources, etc.)
+    [ ] Snapshot stored in .sisyphus/evidence/
+  Blocking: YES - Cannot proceed without snapshot
+
+Gate 7: FK Dependency Audit
+  Status: REQUIRED
+  Evidence: All foreign key relationships documented
+  Verification:
+    [ ] All FKs referencing places.id documented
+    [ ] No FKs reference deprecated columns
+    [ ] FK integrity verified post-cleanup
+  Blocking: YES - Cannot proceed without audit
+
+Gate 8: Index Inventory
+  Status: REQUIRED
+  Evidence: All indexes on places table documented
+  Verification:
+    [ ] idx_places_geom identified for removal
+    [ ] No other indexes reference deprecated columns
+    [ ] Index removal plan documented
+  Blocking: YES - Cannot proceed without inventory
+
+================================================================================
+3. POST-CLEANUP VERIFICATION GATES
+================================================================================
+
+Gate 9: Schema Verification
+  Status: REQUIRED (post-cleanup)
+  Evidence: places table has exactly 6 columns
+  Verification:
+    [ ] Column count = 6
+    [ ] Columns match: id, lat, lon, is_active, created_at, updated_at
+    [ ] No unexpected columns remain
+  Blocking: YES - Cleanup not complete until verified
+
+Gate 10: Application Smoke Test
+  Status: REQUIRED (post-cleanup)
+  Evidence: Core application functions work
+  Verification:
+    [ ] Place lookup by ID works
+    [ ] Place lookup by lat/lon works
+    [ ] campsite_full view returns data
+    [ ] get_place_source_bundle returns data
+    [ ] No 500 errors in application logs
+  Blocking: YES - Cleanup not complete until verified
+
+Gate 11: Consumer Sync Verification
+  Status: REQUIRED (post-cleanup)
+  Evidence: Consumer repos have updated types
+  Verification:
+    [ ] Product repo synced database.types.ts
+    [ ] Worker repo synced database.types.ts
+    [ ] Consumer CI passes with new types
+  Blocking: YES - Cleanup not complete until verified
+
+Gate 12: 24-Hour Observation Window
+  Status: REQUIRED (post-cleanup)
+  Evidence: No issues during observation period
+  Verification:
+    [ ] No application errors related to places
+    [ ] No consumer complaints
+    [ ] Performance metrics stable
+  Blocking: YES - Cleanup not complete until verified
+
+================================================================================
+4. BLOCKING CONDITIONS (ANY BLOCKS CLEANUP)
+================================================================================
+
+BLOCKER 1: campsite_full view still references deprecated places columns
+BLOCKER 2: get_place_source_bundle RPC still returns deprecated places columns
+BLOCKER 3: Rollback plan not documented or tested
+BLOCKER 4: Consumer repos not notified
+BLOCKER 5: Pre-cleanup row count snapshot missing
+BLOCKER 6: FK dependency audit incomplete
+BLOCKER 7: Index inventory incomplete
+BLOCKER 8: Geometry audit incomplete (DONE - not a blocker)
+
+================================================================================
+5. GATE EXECUTION ORDER
+================================================================================
+
+Phase 2→3 Transition Gates (BEFORE cleanup):
+  1. Gate 1: campsite_full cutover verified
+  2. Gate 2: get_place_source_bundle cutover verified
+  3. Gate 3: Rollback readiness confirmed
+  4. Gate 4: Geometry audit complete (DONE)
+  5. Gate 5: Consumer notification sent
+  6. Gate 6: Row count snapshot
+  7. Gate 7: FK dependency audit
+  8. Gate 8: Index inventory
+
+Post-Cleanup Verification Gates (AFTER cleanup):
+  9. Gate 9: Schema verification
+  10. Gate 10: Application smoke test
+  11. Gate 11: Consumer sync verification
+  12. Gate 12: 24-hour observation window
+
+================================================================================
+6. EVIDENCE ARTIFACTS REQUIRED
+================================================================================
+
+Before cleanup:
+  - .sisyphus/evidence/task-15-final-places.txt (DONE)
+  - .sisyphus/evidence/task-15-cleanup-gates.txt (THIS FILE)
+  - .sisyphus/evidence/task-5-geometry-audit.txt (DONE)
+  - .sisyphus/evidence/task-6-checkpoints.txt (DONE)
+  - Pre-cleanup row count snapshot (TODO)
+  - FK dependency audit (TODO)
+  - Index inventory (TODO)
+
+After cleanup:
+  - Post-cleanup schema verification
+  - Application smoke test results
+  - Consumer sync confirmation
+  - 24-hour observation log
+
+================================================================================
+7. SUMMARY
+================================================================================
+
+TOTAL GATES: 12
+GATES DONE: 1 (Gate 4: Geometry audit)
+GATES REQUIRED: 11
+BLOCKING CONDITIONS: 7
+
+CLEANUP CANNOT PROCEED UNTIL:
+  - All Phase 2→3 transition gates pass (Gates 1-8)
+  - All blocking conditions resolved
+  - Evidence artifacts generated
+
+CLEANUP NOT COMPLETE UNTIL:
+  - All post-cleanup verification gates pass (Gates 9-12)
+  - 24-hour observation window complete
+  - No blocking issues identified

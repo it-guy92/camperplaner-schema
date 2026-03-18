@@ -1,0 +1,186 @@
+================================================================================
+TASK 11: USER CORRECTION MODEL FOR place_user_properties
+================================================================================
+Generated: 2026-03-18
+Plan: place-properties-migration
+Task: 11 - Define the user correction model for place_user_properties
+
+================================================================================
+SECTION 1: USER SCHEMA OVERVIEW
+================================================================================
+
+The place_user_properties table stores user-submitted property corrections for
+places. Each user can submit multiple corrections over time, with only the
+latest correction being "current".
+
+This table follows the SHARED PROPERTY SCHEMA CONTRACT (task-2-schema-contract.txt)
+plus one user-specific column.
+
+================================================================================
+SECTION 2: TABLE STRUCTURE
+================================================================================
+
+place_user_properties (
+    -- INFRASTRUCTURE / ROW IDENTITY (5 columns)
+    id                  bigserial PRIMARY KEY,
+    place_id            bigint NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    is_current          boolean NOT NULL DEFAULT true,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz NOT NULL DEFAULT now(),
+    source_updated_at   timestamptz NULL,
+
+    -- SHARED: IDENTITY / CONTENT (5 columns)
+    name                text NULL,
+    description         text NULL,
+    place_type          text NULL,
+    source_place_type   text NULL,
+    source_categories   text[] NULL,
+
+    -- SHARED: ADDRESS / LOCATION (7 columns)
+    country_code        text NULL,
+    region              text NULL,
+    city                text NULL,
+    postcode            text NULL,
+    address             text NULL,
+    source_lat          numeric NULL,
+    source_lon          numeric NULL,
+
+    -- SHARED: CONTACT / OPERATIONS (5 columns)
+    website             text NULL,
+    phone               text NULL,
+    email               text NULL,
+    opening_hours       text NULL,
+    fee_info            text NULL,
+
+    -- SHARED: GENERIC FLAGS (8 columns)
+    wheelchair_accessible   boolean NULL,
+    family_friendly         boolean NULL,
+    pets_allowed            boolean NULL,
+    indoor                  boolean NULL,
+    outdoor                 boolean NULL,
+    entry_fee_required      boolean NULL,
+    reservation_required    boolean NULL,
+    overnight_stay_allowed  boolean NULL,
+
+    -- SHARED: GENERAL FACILITIES (7 columns)
+    has_parking         boolean NULL,
+    has_restrooms       boolean NULL,
+    has_drinking_water  boolean NULL,
+    has_wifi            boolean NULL,
+    has_shop            boolean NULL,
+    has_restaurant      boolean NULL,
+    has_cafe            boolean NULL,
+
+    -- SHARED: CAMPING PERMISSIONS (3 columns)
+    caravan_allowed     boolean NULL,
+    motorhome_allowed   boolean NULL,
+    tent_allowed        boolean NULL,
+
+    -- SHARED: CAMPING FACILITIES (5 columns)
+    has_electricity     boolean NULL,
+    has_fresh_water     boolean NULL,
+    has_shower          boolean NULL,
+    has_laundry         boolean NULL,
+    has_dishwashing_area boolean NULL,
+
+    -- SHARED: DISPOSAL / UTILITIES (6 columns)
+    has_grey_water_disposal     boolean NULL,
+    has_black_water_disposal    boolean NULL,
+    has_chemical_toilet_disposal boolean NULL,
+    has_dump_station            boolean NULL,
+    has_waste_disposal          boolean NULL,
+    has_recycling               boolean NULL,
+
+    -- SHARED: LEISURE (5 columns)
+    has_bbq_area        boolean NULL,
+    has_fire_pit        boolean NULL,
+    has_playground      boolean NULL,
+    has_pool            boolean NULL,
+    has_beach           boolean NULL,
+
+    -- SHARED: NUDISM (2 columns)
+    nudism_allowed      boolean NULL,
+    nudism_only         boolean NULL,
+
+    -- SHARED: ATTRACTION / MUSEUM (5 columns)
+    has_guided_tours    boolean NULL,
+    has_audio_guide     boolean NULL,
+    has_visitor_center  boolean NULL,
+    has_lockers         boolean NULL,
+    photography_allowed boolean NULL,
+
+    -- USER-SPECIFIC (1 column) - THE DIFFERENCE FROM SHARED SCHEMA
+    user_id             uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE
+)
+
+TOTAL COLUMNS: 56 (55 shared + 1 user-specific)
+
+================================================================================
+SECTION 3: FOREIGN KEY RELATIONSHIPS
+================================================================================
+
+place_user_properties has two foreign keys:
+
+1. place_id → places(id)
+   - ON DELETE CASCADE: If a place is deleted, all user corrections are deleted
+   - Ensures referential integrity with the canonical places table
+
+2. user_id → profiles(id)
+   - ON DELETE CASCADE: If a user profile is deleted, all their corrections are deleted
+   - Ensures referential integrity with the profiles table
+
+NOTE: The current migration (20260318200000_add_property_tables.sql) is MISSING
+the FK constraint for user_id. This must be added in a follow-up migration.
+
+================================================================================
+SECTION 4: COLUMN PURPOSES
+================================================================================
+
+user_id:
+    - Identifies which user submitted the correction
+    - Required (NOT NULL) - every correction must be attributed
+    - Enables per-user correction history tracking
+    - Enables user-specific read resolution (show user's own corrections)
+
+source_updated_at:
+    - When the user submitted or updated this correction
+    - NULL until explicitly set by user action
+    - Distinct from updated_at (which tracks any row modification)
+
+is_current:
+    - TRUE = This is the user's latest correction for this place
+    - FALSE = This is an older correction, superseded by a newer one
+    - Only ONE current row allowed per (place_id, user_id) combination
+
+All other columns follow the shared schema contract (task-2-schema-contract.txt).
+
+================================================================================
+SECTION 5: DIFFERENCE FROM SHARED SCHEMA
+================================================================================
+
+The ONLY structural difference between place_user_properties and the other
+property tables (place_osm_properties, place_google_properties, place_llm_properties)
+is the addition of user_id.
+
+All other columns - their types, nullability, defaults - are IDENTICAL to the
+shared schema contract. This ensures:
+- Consistent read resolution across all sources
+- Uniform boolean semantics (NULL = unknown, TRUE = confirmed, FALSE = denied)
+- Simple UNION queries across all property tables
+
+================================================================================
+SECTION 6: BOOLEAN SEMANTICS (APPLIES TO ALL SHARED COLUMNS)
+================================================================================
+
+NULL  = User did NOT claim anything about this property
+       (user left field blank, didn't know, or source had no info)
+
+FALSE = User EXPLICITLY DENIED this property
+       (user stated feature is NOT present or NOT allowed)
+
+TRUE  = User EXPLICITLY CONFIRMED this property
+       (user stated feature IS present or IS allowed)
+
+================================================================================
+END OF USER SCHEMA DEFINITION
+================================================================================

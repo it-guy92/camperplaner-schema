@@ -1,0 +1,74 @@
+# F4: Scope Creep Verification
+# Generated: 2026-03-18
+# Purpose: Confirm only authorized tables exist; no unauthorized tables created
+
+================================================================================
+VERIFICATION RESULT: PASS
+================================================================================
+
+No scope creep detected. Only authorized tables are created in the migration.
+
+================================================================================
+AUTHORIZED TABLES (from context)
+================================================================================
+
+Core tables (pre-existing):
+- places
+- place_osm_properties (NEW - authorized)
+- place_google_properties (NEW - authorized)
+- place_llm_properties (NEW - authorized)
+- place_user_properties (NEW - authorized)
+
+Google family (pre-existing):
+- place_google_sources
+- place_google_reviews (RETAINED)
+- place_google_photos (RETAINED)
+
+LLM family (pre-existing):
+- place_llm_enrichments
+
+Deprecated tables (scheduled for removal):
+- place_google_amenities
+- place_google_types
+- place_llm_facts
+- place_llm_sources
+- place_llm_evidence_markers
+- place_source_evidence_runs
+- place_evidence_sources
+- place_evidence_markers
+
+================================================================================
+MIGRATION ANALYSIS (20260318200000_add_property_tables.sql)
+================================================================================
+
+Tables created in migration:
+1. place_osm_properties ✅ AUTHORIZED
+2. place_google_properties ✅ AUTHORIZED
+3. place_llm_properties ✅ AUTHORIZED
+4. place_user_properties ✅ AUTHORIZED
+
+Total CREATE TABLE statements: 4
+Unauthorized tables: 0
+
+================================================================================
+SQL SEARCH VERIFICATION
+================================================================================
+
+Search: CREATE TABLE in 20260318200000_add_property_tables.sql
+Results: 4 matches (all authorized)
+
+Search: DROP TABLE in all migrations
+Results:
+- rollback_restructure.sql: DROP cleanup_log (rollback script, not forward migration)
+- 20260314000011_drop_decommissioned_legacy_tables.sql: Drops legacy tables
+  (place_features, google_place_matches, external_place_cache) - not related to
+  current property table migration
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✅ No unauthorized tables created
+✅ No scope creep detected
+✅ All 4 created tables are authorized property tables
+✅ Deprecated tables are not dropped in this migration (expand-contract pattern)

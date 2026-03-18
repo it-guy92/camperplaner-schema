@@ -1,0 +1,84 @@
+# F3 Evidence Inventory - Verification Rehearsal Review
+# Generated: 2026-03-18
+# Purpose: Confirm every task (T1-T17) has at least one evidence file
+
+## Evidence File Inventory
+
+### Task 1: Audit all consumers of existing `places` business columns
+✅ task-1-dependency-audit.txt
+✅ task-1-read-model-breakpoints.txt
+
+### Task 2: Define the final shared and source-specific property schema contract
+✅ task-2-schema-contract.txt
+✅ task-2-minimal-places.txt
+
+### Task 3: Design one-current-row constraints, indexes, and null semantics
+✅ task-3-current-row-rules.txt
+✅ task-3-null-semantics.txt
+
+### Task 4: Map every deprecated table and `places` column to a deterministic target field
+✅ task-4-mapping-matrix.txt
+✅ task-4-source-meaning.txt
+
+### Task 5: Audit geometry and spatial dependencies before removing `geom`
+✅ task-5-geometry-audit.txt
+✅ task-5-places-geometry-check.txt
+
+### Task 6: Design rollback checkpoints, lock safety, and migration evidence policy
+✅ task-6-checkpoints.txt
+✅ task-6-rollback-rules.txt
+
+### Task 7: Create the additive migration design for all four property tables
+✅ task-7-additive-tables.txt
+✅ task-7-nonbreaking-check.txt
+
+### Task 8: Design batched backfill from current `places` and `osm_source` into `place_osm_properties`
+✅ task-8-osm-mapping.txt
+✅ task-8-no-osm-edgecase.txt
+
+### Task 9: Design batched backfill from Google source tables into `place_google_properties`
+✅ task-9-google-mapping.txt
+✅ task-9-google-children.txt
+
+### Task 10: Design batched backfill from LLM tables into `place_llm_properties`
+✅ task-10-llm-mapping.txt
+✅ task-10-llm-current-row.txt
+
+### Task 11: Define the user correction model for `place_user_properties`
+✅ task-11-user-schema.txt
+✅ task-11-user-current-row.txt
+
+### Task 12: Update documentation and generated type migration strategy
+✅ task-12-doc-scope.txt
+✅ task-12-type-sync.txt
+
+### Task 13: Redesign `campsite_full` to resolve data from property tables instead of `places`
+✅ task-13-view-cutover.txt
+✅ task-13-resolution-order.txt
+
+### Task 14: Redesign `get_place_source_bundle` and related RPC expectations
+✅ task-14-bundle-contract.txt
+✅ task-14-bundle-docs.txt
+
+### Task 15: Plan cleanup of `places` down to its minimal final shape
+✅ task-15-final-places.txt
+✅ task-15-cleanup-gates.txt
+
+### Task 16: Plan removal of deprecated tables after cutover validation
+✅ task-16-drop-sequence.txt
+✅ task-16-replacement-gates.txt
+
+### Task 17: Plan downstream sync and consumer migration sequence
+✅ task-17-downstream-sequence.txt
+✅ task-17-consumer-gate.txt
+
+## Summary
+
+- Total tasks verified: 17/17
+- Total evidence files found: 34 (2 per task)
+- Missing evidence: NONE
+- Extra evidence files: task-15-schema-workflow-doc.md, task-10-schema-ci.txt (bonus, not harmful)
+
+## Verification Result: PASS
+
+Every task (T1-T17) has at least one evidence file. All expected evidence paths exist.

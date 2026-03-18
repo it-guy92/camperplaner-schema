@@ -1,0 +1,175 @@
+================================================================================
+TASK 7 EVIDENCE: Additive Property Tables Created
+================================================================================
+Generated: 2026-03-18
+Task: Create additive migration SQL for all four property tables
+
+================================================================================
+1. MIGRATION FILE CREATED
+================================================================================
+
+File: supabase/migrations/20260318200000_add_property_tables.sql
+Timestamp: 20260318200000 (2026-03-18 20:00:00 UTC)
+
+================================================================================
+2. TABLES CREATED
+================================================================================
+
+2.1 place_osm_properties
+    - 60 columns total (55 shared + 5 OSM-specific)
+    - OSM-specific: osm_source_id, osm_id, osm_type, osm_version, osm_timestamp
+    - FK: place_id → places(id) ON DELETE CASCADE
+    - Current-row: uidx_osm_properties_place_current (place_id WHERE is_current=true)
+
+2.2 place_google_properties
+    - 61 columns total (55 shared + 6 Google-specific)
+    - Google-specific: google_source_id, google_place_id, rating, review_count, business_status, expires_at
+    - FK: place_id → places(id) ON DELETE CASCADE
+    - Current-row: uidx_google_properties_place_current (place_id WHERE is_current=true)
+
+2.3 place_llm_properties
+    - 61 columns total (55 shared + 6 LLM-specific)
+    - LLM-specific: llm_enrichment_id, provider, model, summary_de, trust_score, source_urls
+    - FK: place_id → places(id) ON DELETE CASCADE
+    - Current-row: uidx_llm_properties_place_current (place_id WHERE is_current=true)
+
+2.4 place_user_properties
+    - 56 columns total (55 shared + 1 User-specific)
+    - User-specific: user_id (uuid, NOT NULL)
+    - FK: place_id → places(id) ON DELETE CASCADE
+    - Current-row: uidx_user_properties_place_user_current (place_id, user_id WHERE is_current=true)
+
+================================================================================
+3. SHARED COLUMNS (55 total per table)
+================================================================================
+
+Infrastructure/Row Identity (5):
+  id, place_id, is_current, created_at, updated_at, source_updated_at
+
+Identity/Content (5):
+  name, description, place_type, source_place_type, source_categories
+
+Address/Location (7):
+  country_code, region, city, postcode, address, source_lat, source_lon
+
+Contact/Operations (5):
+  website, phone, email, opening_hours, fee_info
+
+Generic Flags (8):
+  wheelchair_accessible, family_friendly, pets_allowed, indoor, outdoor,
+  entry_fee_required, reservation_required, overnight_stay_allowed
+
+General Facilities (7):
+  has_parking, has_restrooms, has_drinking_water, has_wifi, has_shop,
+  has_restaurant, has_cafe
+
+Camping Permissions (3):
+  caravan_allowed, motorhome_allowed, tent_allowed
+
+Camping Facilities (5):
+  has_electricity, has_fresh_water, has_shower, has_laundry, has_dishwashing_area
+
+Disposal/Utilities (6):
+  has_grey_water_disposal, has_black_water_disposal, has_chemical_toilet_disposal,
+  has_dump_station, has_waste_disposal, has_recycling
+
+Leisure (5):
+  has_bbq_area, has_fire_pit, has_playground, has_pool, has_beach
+
+Nudism (2):
+  nudism_allowed, nudism_only
+
+Attraction/Museum (5):
+  has_guided_tours, has_audio_guide, has_visitor_center, has_lockers, photography_allowed
+
+================================================================================
+4. CONSTRAINTS
+================================================================================
+
+4.1 Foreign Keys (all tables):
+    - CONSTRAINT fk_*_properties_place FOREIGN KEY (place_id)
+      REFERENCES places(id) ON DELETE CASCADE
+
+4.2 Partial Unique Indexes (current-row semantics):
+    - uidx_osm_properties_place_current ON place_osm_properties(place_id) WHERE is_current = true
+    - uidx_google_properties_place_current ON place_google_properties(place_id) WHERE is_current = true
+    - uidx_llm_properties_place_current ON place_llm_properties(place_id) WHERE is_current = true
+    - uidx_user_properties_place_user_current ON place_user_properties(place_id, user_id) WHERE is_current = true
+
+================================================================================
+5. INDEXES CREATED
+================================================================================
+
+5.1 place_osm_properties:
+    - idx_osm_properties_place_id (place_id)
+    - idx_osm_properties_is_current (is_current WHERE is_current=true)
+    - idx_osm_properties_osm_id (osm_id WHERE osm_id IS NOT NULL)
+    - idx_osm_properties_place_current (place_id, is_current WHERE is_current=true)
+
+5.2 place_google_properties:
+    - idx_google_properties_place_id (place_id)
+    - idx_google_properties_is_current (is_current WHERE is_current=true)
+    - idx_google_properties_google_place_id (google_place_id WHERE google_place_id IS NOT NULL)
+    - idx_google_properties_expires (expires_at WHERE expires_at IS NOT NULL)
+    - idx_google_properties_place_current (place_id, is_current WHERE is_current=true)
+
+5.3 place_llm_properties:
+    - idx_llm_properties_place_id (place_id)
+    - idx_llm_properties_is_current (is_current WHERE is_current=true)
+    - idx_llm_properties_provider (provider WHERE provider IS NOT NULL)
+    - idx_llm_properties_place_current (place_id, is_current WHERE is_current=true)
+
+5.4 place_user_properties:
+    - idx_user_properties_place_id (place_id)
+    - idx_user_properties_user_id (user_id)
+    - idx_user_properties_user_current (user_id, is_current WHERE is_current=true)
+    - idx_user_properties_place_user_current (place_id, user_id, is_current WHERE is_current=true)
+
+================================================================================
+6. TRIGGERS
+================================================================================
+
+Auto-update triggers for updated_at column:
+    - trg_place_osm_properties_updated_at
+    - trg_place_google_properties_updated_at
+    - trg_place_llm_properties_updated_at
+    - trg_place_user_properties_updated_at
+
+Uses existing update_updated_at_column() function.
+
+================================================================================
+7. ROW LEVEL SECURITY
+================================================================================
+
+All four tables have RLS enabled with restrictive policies:
+    - "Service role can manage OSM properties"
+    - "Service role can manage Google properties"
+    - "Service role can manage LLM properties"
+    - "Service role can manage User properties"
+
+Policies use USING (false) / WITH CHECK (false) for initial lockdown.
+
+================================================================================
+8. BOOLEAN SEMANTICS
+================================================================================
+
+All boolean columns follow no-claim semantics:
+    - DEFAULT NULL (not DEFAULT false)
+    - NULL = source made no claim
+    - FALSE = source explicitly denied
+    - TRUE = source explicitly confirmed
+
+================================================================================
+9. MIGRATION SAFETY
+================================================================================
+
+- SET lock_timeout = '5s' before DDL operations
+- CREATE TABLE IF NOT EXISTS for idempotency
+- CREATE INDEX IF NOT EXISTS for idempotency
+- No DROP TABLE or DROP COLUMN statements
+- No ALTER TABLE statements that remove data
+- All operations are additive-only
+
+================================================================================
+END OF EVIDENCE
+================================================================================

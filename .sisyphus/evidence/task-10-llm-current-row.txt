@@ -1,0 +1,197 @@
+# Task 10: Current-Row Selection Logic — place_llm_enrichments → place_llm_properties
+# Generated: 2026-03-18
+# Purpose: Define how is_current propagates from LLM enrichments to LLM properties
+
+================================================================================
+SECTION 1: CURRENT-ROW SEMANTICS OVERVIEW
+================================================================================
+
+Both tables enforce one current row per place via partial unique indexes:
+
+| Table                    | Index Name                              | Constraint                    |
+|--------------------------|-----------------------------------------|-------------------------------|
+| place_llm_enrichments    | idx_llm_enrichments_place_is_current    | 1 current enrichment/place    |
+| place_llm_properties     | uidx_llm_properties_place_current       | 1 current property/place      |
+
+Rule: place_llm_properties.is_current DIRECTLY MIRRORS place_llm_enrichments.is_current
+
+================================================================================
+SECTION 2: SOURCE CURRENT-ROW SELECTION
+================================================================================
+
+place_llm_enrichments uses is_current boolean column:
+
+  SELECT * FROM place_llm_enrichments
+  WHERE place_id = <pid> AND is_current = true
+  LIMIT 1;
+
+This is enforced by partial unique index:
+  CREATE UNIQUE INDEX idx_llm_enrichments_place_is_current
+    ON place_llm_enrichments(place_id, is_current)
+    WHERE is_current = true;
+
+Guarantees:
+- At most ONE current enrichment per place
+- Multiple historical enrichments may exist (is_current=false)
+- Application logic sets is_current=false on old rows when new enrichment completes
+
+================================================================================
+SECTION 3: TARGET CURRENT-ROW MAPPING
+================================================================================
+
+Direct 1:1 propagation:
+
+  place_llm_properties.is_current = place_llm_enrichments.is_current
+
+This is enforced by partial unique index:
+  CREATE UNIQUE INDEX uidx_llm_properties_place_current
+    ON place_llm_properties(place_id)
+    WHERE is_current = true;
+
+Mapping rules:
+| Source is_current | Target is_current | Property Row Created? |
+|-------------------|-------------------|----------------------|
+| true              | true              | YES (current row)    |
+| false             | false             | YES (historical row) |
+| (no enrichment)   | —                 | NO (no row created)  |
+
+================================================================================
+SECTION 4: BACKFILL CURRENT-ROW LOGIC
+================================================================================
+
+During batched backfill, is_current is copied directly:
+
+```sql
+INSERT INTO place_llm_properties (place_id, is_current, ...)
+SELECT ple.place_id, ple.is_current, ...
+FROM place_llm_enrichments ple
+WHERE ple.status = 'completed';
+```
+
+Post-backfill verification:
+```sql
+-- Verify current rows match
+SELECT
+    (SELECT COUNT(*) FROM place_llm_enrichments WHERE is_current = true AND status = 'completed') AS source_current,
+    (SELECT COUNT(*) FROM place_llm_properties WHERE is_current = true) AS target_current;
+-- Expected: source_current = target_current
+```
+
+================================================================================
+SECTION 5: EDGE CASES
+================================================================================
+
+5.1 PLACE WITH NO COMPLETED ENRICHMENT
+- No property row created
+- place_id has no LLM properties at all
+- This is correct: no data = no row
+
+5.2 PLACE WITH MULTIPLE ENRICHMENTS (1 current, N historical)
+- All enrichments with status='completed' get property rows
+- Only the is_current=true enrichment gets is_current=true property row
+- Historical enrichments get is_current=false property rows
+- Partial unique index satisfied: only 1 current per place
+
+5.3 PLACE WITH ALL FAILED ENRICHMENTS
+- No property rows created (status='completed' filter)
+- place_id has no LLM properties
+- Correct: failed enrichments have no valid data
+
+5.4 PLACE WITH CURRENT ENRICHMENT = FAILED
+- If is_current=true but status='failed' → no property row
+- This is an inconsistent state in source data
+- Backfill should skip (status='completed' filter handles this)
+- Application should fix: set is_current=false on failed enrichments
+
+5.5 CONSTRAINT VIOLATION DURING BACKFILL
+- If two enrichments for same place both have is_current=true
+- This violates source partial unique index (should not happen)
+- Backfill INSERT will fail on target partial unique index
+- Resolution: Fix source data first, then retry backfill
+
+================================================================================
+SECTION 6: POST-BACKFILL CURRENT-ROW MANAGEMENT
+================================================================================
+
+After backfill, new enrichments follow this lifecycle:
+
+1. New enrichment completes → INSERT into place_llm_enrichments (is_current=true)
+2. Application: UPDATE old enrichment SET is_current=false WHERE place_id=X AND is_current=true
+3. Backfill job: INSERT into place_llm_properties from new enrichment (is_current=true)
+4. Backfill job: UPDATE old property SET is_current=false WHERE place_id=X AND is_current=true
+
+Alternatively, use a trigger or upsert pattern:
+
+```sql
+-- Upsert pattern for new enrichments
+INSERT INTO place_llm_properties (place_id, is_current, ...)
+SELECT ple.place_id, true, ...
+FROM place_llm_enrichments ple
+WHERE ple.id = <new_enrichment_id>
+ON CONFLICT (place_id) WHERE is_current = true
+DO UPDATE SET
+    is_current = false;
+
+-- Then insert the new current row
+INSERT INTO place_llm_properties (place_id, is_current, ...)
+VALUES (<place_id>, true, ...);
+```
+
+Note: The partial unique index prevents two current rows. The application must
+demote the old row BEFORE promoting the new one, or use the two-step pattern above.
+
+================================================================================
+SECTION 7: CURRENT-ROW VERIFICATION QUERIES
+================================================================================
+
+```sql
+-- 1. Count match
+SELECT
+    'source' AS side,
+    COUNT(*) AS current_count
+FROM place_llm_enrichments
+WHERE is_current = true AND status = 'completed'
+UNION ALL
+SELECT
+    'target' AS side,
+    COUNT(*) AS current_count
+FROM place_llm_properties
+WHERE is_current = true;
+
+-- 2. Per-place match (should return 0 rows if all match)
+SELECT ple.place_id
+FROM place_llm_enrichments ple
+WHERE ple.is_current = true AND ple.status = 'completed'
+    AND NOT EXISTS (
+        SELECT 1 FROM place_llm_properties plp
+        WHERE plp.place_id = ple.place_id AND plp.is_current = true
+    );
+
+-- 3. Orphan current rows (should return 0 rows)
+SELECT plp.place_id
+FROM place_llm_properties plp
+WHERE plp.is_current = true
+    AND NOT EXISTS (
+        SELECT 1 FROM place_llm_enrichments ple
+        WHERE ple.place_id = plp.place_id AND ple.is_current = true AND ple.status = 'completed'
+    );
+
+-- 4. Multiple current rows per place (should return 0 rows — constraint violation)
+SELECT place_id, COUNT(*) AS current_count
+FROM place_llm_properties
+WHERE is_current = true
+GROUP BY place_id
+HAVING COUNT(*) > 1;
+```
+
+================================================================================
+SECTION 8: SUMMARY
+================================================================================
+
+Current-row selection is deterministic:
+- Source: place_llm_enrichments.is_current = true (enforced by partial unique index)
+- Target: place_llm_properties.is_current = direct copy (enforced by partial unique index)
+- Backfill: Only status='completed' enrichments create property rows
+- Lifecycle: Application manages is_current transitions; backfill copies state
+
+No ambiguity. No heuristics. Direct propagation with constraint enforcement.

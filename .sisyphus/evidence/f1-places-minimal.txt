@@ -1,0 +1,175 @@
+================================================================================
+F1: PLACES TABLE MINIMAL TARGET VERIFICATION
+================================================================================
+Date: 2026-03-18
+Plan: place-properties-migration
+Task: F1 - Verify places target has exactly 6 columns
+
+================================================================================
+SECTION 1: CURRENT STATE (32 columns)
+================================================================================
+
+Reference: docs/database-schema.md lines 230-266
+
+Current `places` table has 32 columns:
+
+| #  | Column            | Type        | Constraints      | Status    |
+|----|-------------------|-------------|------------------|-----------|
+| 1  | id                | bigint      | PK, NOT NULL     | KEEP      |
+| 2  | place_type        | text        | NOT NULL         | REMOVE    |
+| 3  | name              | text        | NOT NULL         | REMOVE    |
+| 4  | geom              | geometry    | NOT NULL         | REMOVE    |
+| 5  | lat               | numeric     | NULL             | KEEP      |
+| 6  | lon               | numeric     | NULL             | KEEP      |
+| 7  | country_code      | text        | NULL             | REMOVE    |
+| 8  | region            | text        | NULL             | REMOVE    |
+| 9  | city              | text        | NULL             | REMOVE    |
+| 10 | postcode          | text        | NULL             | REMOVE    |
+| 11 | address           | text        | NULL             | REMOVE    |
+| 12 | has_toilet        | boolean     | NOT NULL         | REMOVE    |
+| 13 | has_shower        | boolean     | NOT NULL         | REMOVE    |
+| 14 | has_electricity   | boolean     | NOT NULL         | REMOVE    |
+| 15 | has_water         | boolean     | NOT NULL         | REMOVE    |
+| 16 | has_wifi          | boolean     | NOT NULL         | REMOVE    |
+| 17 | pet_friendly      | boolean     | NOT NULL         | REMOVE    |
+| 18 | caravan_allowed   | boolean     | NOT NULL         | REMOVE    |
+| 19 | motorhome_allowed | boolean     | NOT NULL         | REMOVE    |
+| 20 | tent_allowed      | boolean     | NOT NULL         | REMOVE    |
+| 21 | website           | text        | NULL             | REMOVE    |
+| 22 | phone             | text        | NULL             | REMOVE    |
+| 23 | email             | text        | NULL             | REMOVE    |
+| 24 | opening_hours     | text        | NULL             | REMOVE    |
+| 25 | fee_info          | text        | NULL             | REMOVE    |
+| 26 | source_primary    | text        | NOT NULL         | REMOVE    |
+| 27 | data_confidence   | numeric     | NULL             | REMOVE    |
+| 28 | last_seen_at      | timestamptz | NULL             | REMOVE    |
+| 29 | last_enriched_at  | timestamptz | NULL             | REMOVE    |
+| 30 | is_active         | boolean     | NOT NULL         | KEEP      |
+| 31 | created_at        | timestamptz | NOT NULL         | KEEP      |
+| 32 | updated_at        | timestamptz | NOT NULL         | KEEP      |
+
+================================================================================
+SECTION 2: TARGET STATE (6 columns)
+================================================================================
+
+Reference: .sisyphus/evidence/task-15-final-places.txt
+
+Target `places` table MUST have exactly 6 columns:
+
+| #  | Column     | Type        | Constraints      | Purpose                    |
+|----|------------|-------------|------------------|----------------------------|
+| 1  | id         | bigint      | PK, NOT NULL     | Place identifier           |
+| 2  | lat        | numeric     | NULL             | Latitude coordinate        |
+| 3  | lon        | numeric     | NULL             | Longitude coordinate       |
+| 4  | is_active  | boolean     | NOT NULL         | Soft-delete flag           |
+| 5  | created_at | timestamptz | NOT NULL         | Record creation timestamp  |
+| 6  | updated_at | timestamptz | NOT NULL         | Last modification timestamp|
+
+TARGET COLUMN COUNT: 6 ✅
+
+================================================================================
+SECTION 3: COLUMNS TO REMOVE (26 columns)
+================================================================================
+
+3.1 Business Data Columns (19 columns)
+  These contain place-specific business data that migrates to property tables:
+  - name → place_*_properties.name
+  - place_type → place_*_properties.place_type
+  - country_code → place_*_properties.country_code
+  - region → place_*_properties.region
+  - city → place_*_properties.city
+  - postcode → place_*_properties.postcode
+  - address → place_*_properties.address
+  - website → place_*_properties.website
+  - phone → place_*_properties.phone
+  - email → place_*_properties.email
+  - opening_hours → place_*_properties.opening_hours
+  - fee_info → place_*_properties.fee_info
+  - has_toilet → place_*_properties.has_restrooms
+  - has_shower → place_*_properties.has_shower
+  - has_electricity → place_*_properties.has_electricity
+  - has_water → place_*_properties.has_fresh_water
+  - has_wifi → place_*_properties.has_wifi
+  - pet_friendly → place_*_properties.pets_allowed
+  - caravan_allowed → place_*_properties.caravan_allowed
+  - motorhome_allowed → place_*_properties.motorhome_allowed
+  - tent_allowed → place_*_properties.tent_allowed
+
+3.2 Geometry Column (1 column + index)
+  - geom → Replaced by lat/lon numeric columns
+  - idx_places_geom GIST index must also be dropped
+
+3.3 Source Tracking Columns (4 columns)
+  - source_primary → Tracked in osm_source, place_google_sources
+  - data_confidence → Tracked in place_llm_enrichments.confidence
+  - last_seen_at → Tracked in osm_source.last_seen_at
+  - last_enriched_at → Tracked in place_llm_enrichments.completed_at
+
+================================================================================
+SECTION 4: MIGRATION STATUS
+================================================================================
+
+Current migration (20260318200000_add_property_tables.sql):
+  ✅ Creates all 4 property tables with business data columns
+  ❌ Does NOT yet drop columns from places table
+
+Required future migration:
+  - Drop 26 columns from places table
+  - Drop idx_places_geom index
+  - Result: places table has exactly 6 columns
+
+Reference: task-15-final-places.txt Section 5 (Migration SQL Template)
+
+================================================================================
+SECTION 5: BUSINESS COLUMN MAPPING VERIFICATION
+================================================================================
+
+All 19 business columns have corresponding columns in property tables:
+
+| places column      | property table column    | present in all 4? |
+|--------------------|--------------------------|-------------------|
+| name               | name                     | ✅ YES            |
+| place_type         | place_type               | ✅ YES            |
+| country_code       | country_code             | ✅ YES            |
+| region             | region                   | ✅ YES            |
+| city               | city                     | ✅ YES            |
+| postcode           | postcode                 | ✅ YES            |
+| address            | address                  | ✅ YES            |
+| website            | website                  | ✅ YES            |
+| phone              | phone                    | ✅ YES            |
+| email              | email                    | ✅ YES            |
+| opening_hours      | opening_hours            | ✅ YES            |
+| fee_info           | fee_info                 | ✅ YES            |
+| has_toilet         | has_restrooms            | ✅ YES            |
+| has_shower         | has_shower               | ✅ YES            |
+| has_electricity    | has_electricity          | ✅ YES            |
+| has_water          | has_fresh_water          | ✅ YES            |
+| has_wifi           | has_wifi                 | ✅ YES            |
+| pet_friendly       | pets_allowed             | ✅ YES            |
+| caravan_allowed    | caravan_allowed          | ✅ YES            |
+| motorhome_allowed  | motorhome_allowed        | ✅ YES            |
+| tent_allowed       | tent_allowed             | ✅ YES            |
+
+Note: Column name mappings:
+  - has_toilet → has_restrooms (semantic match)
+  - has_water → has_fresh_water (more specific)
+  - pet_friendly → pets_allowed (semantic match)
+
+================================================================================
+VERDICT: CONDITIONAL PASS ⚠️
+================================================================================
+
+The target design is CORRECT:
+  ✅ Target has exactly 6 columns: id, lat, lon, is_active, created_at, updated_at
+  ✅ All 19 business columns have homes in property tables
+  ✅ Geometry column replacement (lat/lon) is valid
+  ✅ Source tracking columns have homes in source tables
+
+However, the places cleanup migration has NOT been created yet:
+  ❌ No migration file drops the 26 columns from places
+  ❌ idx_places_geom index still exists
+
+This is EXPECTED - the property tables must exist before places cleanup.
+The cleanup migration should be the next step after property table validation.
+
+Action required: Create places cleanup migration after 24-hour observation window.

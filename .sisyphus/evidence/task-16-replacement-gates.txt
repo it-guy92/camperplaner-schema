@@ -1,0 +1,346 @@
+# Task 16: Replacement Gates for Deprecated Table Removal
+# Generated: 2026-03-18
+# Purpose: Explicit cleanup gates that must pass before each deprecated table is dropped
+
+================================================================================
+SECTION 1: GATE FRAMEWORK
+================================================================================
+
+Each deprecated table has a cleanup gate with 4 mandatory checks:
+
+1. BACKFILL VERIFIED: Target property table has data for all places that had data in deprecated table
+2. READ CUTOVER VERIFIED: No application code reads from deprecated table
+3. WRITE CUTOVER VERIFIED: No application code writes to deprecated table
+4. ROLLBACK READINESS: Pre-drop backup exists and is verified
+
+ALL 4 checks must pass before a table enters the drop queue.
+
+================================================================================
+SECTION 2: GATE DEFINITIONS PER TABLE
+================================================================================
+
+--------------------------------------------------------------------------------
+GATE 1: place_llm_evidence_markers
+--------------------------------------------------------------------------------
+
+Target: DISCARD (no replacement table; data not migrated)
+
+Gate 1.1 — BACKFILL VERIFIED (N/A)
+  - No data migration required
+  - Trust markers are process data, not place properties
+  - Trust captured in place_llm_properties.trust_score
+  - CHECK: SELECT COUNT(*) FROM place_llm_properties WHERE trust_score IS NOT NULL
+  - PASS: trust_score populated for all places that had LLM enrichments
+
+Gate 1.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_llm_evidence_markers" camperplaner-product/ camperplaner-worker/
+  - CHECK: grep -r "place_llm_evidence_markers" camperplaner-schema/
+  - PASS: Zero references in application code (only migration/schema docs allowed)
+
+Gate 1.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active enrichment_jobs writing to place_llm_evidence_markers
+  - CHECK: Worker code does not INSERT/UPDATE place_llm_evidence_markers
+  - PASS: Worker logs show zero writes for 24h observation window
+
+Gate 1.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_llm_evidence_markers
+  - PASS: pg_dump verification confirms table contents in backup file
+
+--------------------------------------------------------------------------------
+GATE 2: place_evidence_markers
+--------------------------------------------------------------------------------
+
+Target: DISCARD (no replacement table; data not migrated)
+
+Gate 2.1 — BACKFILL VERIFIED (N/A)
+  - No data migration required
+  - Evidence markers are process data
+  - CHECK: N/A
+
+Gate 2.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_evidence_markers" camperplaner-product/ camperplaner-worker/
+  - PASS: Zero references in application code
+
+Gate 2.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_evidence_markers
+  - PASS: Zero writes for 24h observation window
+
+Gate 2.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_evidence_markers
+  - PASS: Backup verified
+
+--------------------------------------------------------------------------------
+GATE 3: place_evidence_sources
+--------------------------------------------------------------------------------
+
+Target: DISCARD (no replacement table; data not migrated)
+
+Gate 3.1 — BACKFILL VERIFIED (N/A)
+  - No data migration required
+  - Source fetch details are process data
+  - CHECK: N/A
+
+Gate 3.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_evidence_sources" camperplaner-product/ camperplaner-worker/
+  - PASS: Zero references in application code
+
+Gate 3.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_evidence_sources
+  - PASS: Zero writes for 24h observation window
+
+Gate 3.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_evidence_sources
+  - PASS: Backup verified
+
+--------------------------------------------------------------------------------
+GATE 4: place_google_amenities
+--------------------------------------------------------------------------------
+
+Target: place_google_properties (flattened boolean columns)
+
+Gate 4.1 — BACKFILL VERIFIED
+  - CHECK: All amenity keys from place_google_amenities exist as columns in place_google_properties
+  - CHECK: Row count comparison:
+    SELECT COUNT(DISTINCT google_source_id) FROM place_google_amenities;
+    SELECT COUNT(*) FROM place_google_properties WHERE google_source_id IS NOT NULL;
+  - PASS: place_google_properties has rows for all google_source_ids that had amenities
+  - CHECK: Spot check 10 random places — amenity values match between old and new
+
+Gate 4.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_google_amenities" camperplaner-product/ camperplaner-worker/
+  - CHECK: Views (campsite_full) read from place_google_properties, not place_google_amenities
+  - PASS: Zero application references; views use new property table
+
+Gate 4.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_google_amenities
+  - CHECK: Google Places enrichment writes to place_google_properties
+  - PASS: Worker logs show writes to new table only
+
+Gate 4.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_google_amenities
+  - PASS: Backup verified
+
+--------------------------------------------------------------------------------
+GATE 5: place_google_types
+--------------------------------------------------------------------------------
+
+Target: place_google_properties (source_place_type, source_categories)
+
+Gate 5.1 — BACKFILL VERIFIED
+  - CHECK: source_place_type populated for all places with Google sources
+  - CHECK: source_categories text[] contains all types from place_google_types
+  - CHECK: Row count comparison:
+    SELECT COUNT(DISTINCT google_source_id) FROM place_google_types;
+    SELECT COUNT(*) FROM place_google_properties WHERE source_place_type IS NOT NULL;
+  - PASS: All Google-sourced places have type data in new table
+  - CHECK: Spot check — primary type matches is_primary=true row from old table
+
+Gate 5.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_google_types" camperplaner-product/ camperplaner-worker/
+  - PASS: Zero application references
+
+Gate 5.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_google_types
+  - PASS: Zero writes for 24h observation window
+
+Gate 5.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_google_types
+  - PASS: Backup verified
+
+--------------------------------------------------------------------------------
+GATE 6: place_llm_facts
+--------------------------------------------------------------------------------
+
+Target: place_llm_properties (typed boolean/text columns)
+
+Gate 6.1 — BACKFILL VERIFIED
+  - CHECK: All field_name values from place_llm_facts mapped to columns in place_llm_properties
+  - CHECK: Row count comparison:
+    SELECT COUNT(DISTINCT llm_enrichment_id) FROM place_llm_facts;
+    SELECT COUNT(*) FROM place_llm_properties WHERE llm_enrichment_id IS NOT NULL;
+  - PASS: place_llm_properties has rows for all enrichments that had facts
+  - CHECK: Spot check 10 random places — boolean amenity values match
+  - CHECK: text fields (website, phone, email, opening_hours, fee_info) populated
+
+Gate 6.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_llm_facts" camperplaner-product/ camperplaner-worker/
+  - PASS: Zero application references
+
+Gate 6.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_llm_facts
+  - CHECK: LLM enrichment writes to place_llm_properties
+  - PASS: Worker logs show writes to new table only
+
+Gate 6.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_llm_facts
+  - PASS: Backup verified
+
+--------------------------------------------------------------------------------
+GATE 7: place_llm_sources
+--------------------------------------------------------------------------------
+
+Target: place_llm_properties (source_urls text[])
+
+Gate 7.1 — BACKFILL VERIFIED
+  - CHECK: source_urls text[] populated for all enrichments that had sources
+  - CHECK: Row count comparison:
+    SELECT COUNT(DISTINCT llm_enrichment_id) FROM place_llm_sources;
+    SELECT COUNT(*) FROM place_llm_properties WHERE source_urls IS NOT NULL AND array_length(source_urls, 1) > 0;
+  - PASS: All enrichments with sources have source_urls array in new table
+  - CHECK: Spot check — URL count matches between old and new
+
+Gate 7.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_llm_sources" camperplaner-product/ camperplaner-worker/
+  - PASS: Zero application references
+
+Gate 7.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_llm_sources
+  - PASS: Zero writes for 24h observation window
+
+Gate 7.4 — ROLLBACK READINESS
+  - CHECK: Pre-drop backup includes place_llm_sources
+  - PASS: Backup verified
+
+--------------------------------------------------------------------------------
+GATE 8: place_source_evidence_runs
+--------------------------------------------------------------------------------
+
+Target: ARCHIVE (source_evidence, evidence_markers) → DISCARD
+
+Gate 8.1 — BACKFILL VERIFIED (N/A for data; archive replaces)
+  - No data migration to property tables
+  - Archive captures debugging data
+  - CHECK: Archive export complete
+  - CHECK: Archive row count matches source table row count
+  - PASS: Archive integrity verified
+
+Gate 8.2 — READ CUTOVER VERIFIED
+  - CHECK: grep -r "place_source_evidence_runs" camperplaner-product/ camperplaner-worker/
+  - PASS: Zero application references
+
+Gate 8.3 — WRITE CUTOVER VERIFIED
+  - CHECK: No active jobs writing to place_source_evidence_runs
+  - CHECK: Child tables (place_evidence_sources, place_evidence_markers) already dropped
+  - PASS: Zero writes for 24h observation window
+
+Gate 8.4 — ROLLBACK READINESS
+  - CHECK: Archive uploaded to cold storage (S3/blob)
+  - CHECK: Archive checksum verified
+  - CHECK: Archive location documented in cutover_audit_log
+  - PASS: Archive recoverable from cold storage
+
+================================================================================
+SECTION 3: GATE EXECUTION ORDER
+================================================================================
+
+Gates must be evaluated in wave order (matching drop sequence):
+
+Wave 1 Gates (evaluate first):
+  - Gate 1: place_llm_evidence_markers
+  - Gate 2: place_evidence_markers
+  - Gate 3: place_evidence_sources
+
+Wave 2 Gates (evaluate after Wave 1 drops):
+  - Gate 4: place_google_amenities
+  - Gate 5: place_google_types
+  - Gate 6: place_llm_facts
+  - Gate 7: place_llm_sources
+
+Wave 3 Gate (evaluate after Wave 2 drops):
+  - Gate 8: place_source_evidence_runs (includes archive step)
+
+Wave 4 (post-drop):
+  - Type cleanup verification
+  - Documentation update verification
+
+================================================================================
+SECTION 4: GATE FAILURE PROTOCOL
+================================================================================
+
+If ANY gate check fails:
+
+1. HALT: Do not proceed with drop for that table
+2. LOG: Record failure in cutover_audit_log with:
+   - table_name
+   - gate_check (e.g., "Gate 4.1 — BACKFILL VERIFIED")
+   - failure_reason
+   - expected_value
+   - actual_value
+3. FIX: Address the root cause
+4. RE-EVALUATE: Re-run the failed gate check
+5. RESUME: Only proceed when all gates for that wave pass
+
+Gate failures are NOT warnings — they are hard stops.
+
+================================================================================
+SECTION 5: GATE VERIFICATION QUERIES
+================================================================================
+
+Backfill verification queries (run against database):
+
+```sql
+-- Gate 4.1: Google amenities backfill
+SELECT
+  (SELECT COUNT(DISTINCT google_source_id) FROM place_google_amenities) AS old_count,
+  (SELECT COUNT(*) FROM place_google_properties WHERE has_electricity IS NOT NULL OR has_water IS NOT NULL) AS new_count;
+
+-- Gate 5.1: Google types backfill
+SELECT
+  (SELECT COUNT(DISTINCT google_source_id) FROM place_google_types) AS old_count,
+  (SELECT COUNT(*) FROM place_google_properties WHERE source_place_type IS NOT NULL) AS new_count;
+
+-- Gate 6.1: LLM facts backfill
+SELECT
+  (SELECT COUNT(DISTINCT llm_enrichment_id) FROM place_llm_facts) AS old_count,
+  (SELECT COUNT(*) FROM place_llm_properties WHERE has_toilet IS NOT NULL OR website IS NOT NULL) AS new_count;
+
+-- Gate 7.1: LLM sources backfill
+SELECT
+  (SELECT COUNT(DISTINCT llm_enrichment_id) FROM place_llm_sources) AS old_count,
+  (SELECT COUNT(*) FROM place_llm_properties WHERE source_urls IS NOT NULL AND array_length(source_urls, 1) > 0) AS new_count;
+```
+
+Read cutover verification (run against codebase):
+
+```bash
+# Gate X.2: Read cutover for each table
+grep -r "place_llm_evidence_markers" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_evidence_markers" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_evidence_sources" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_google_amenities" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_google_types" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_llm_facts" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_llm_sources" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+grep -r "place_source_evidence_runs" ../camperplaner-product/ ../camperplaner-worker/ --include="*.ts" --include="*.tsx" --include="*.js"
+```
+
+================================================================================
+SECTION 6: CURRENT STATE ASSESSMENT
+================================================================================
+
+Based on schema review (2026-03-18):
+
+| Table                        | In database.types.ts? | In schema docs? | Has FK dependents? | Archive needed? |
+|------------------------------|----------------------|-----------------|--------------------|-----------------| 
+| place_llm_evidence_markers   | NO (not in types)    | YES             | NO                 | NO              |
+| place_evidence_markers       | NO (not in types)    | YES             | NO                 | NO              |
+| place_evidence_sources       | NO (not in types)    | YES             | NO                 | NO              |
+| place_google_amenities       | NO (not in types)    | YES             | NO                 | NO              |
+| place_google_types           | NO (not in types)    | YES             | NO                 | NO              |
+| place_llm_facts              | NO (not in types)    | YES             | NO                 | NO              |
+| place_llm_sources            | NO (not in types)    | YES             | NO                 | NO              |
+| place_source_evidence_runs   | YES (in types)       | YES             | YES (children already dropped) | YES |
+
+NOTE: Most deprecated tables are NOT in generated/database.types.ts, meaning they were
+already excluded from type generation. place_source_evidence_runs IS in types and must
+be removed from types AFTER the table is dropped.
+
+---
+
+**Verification:**
+- [ ] task-16-replacement-gates.txt created at .sisyphus/evidence/task-16-replacement-gates.txt
+- [ ] Every deprecated table has 4 mandatory gate checks defined
+- [ ] Backfill verification queries provided
+- [ ] Read cutover verification commands provided
+- [ ] Gate failure protocol documented
+- [ ] Current state assessment complete

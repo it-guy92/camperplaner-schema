@@ -1,0 +1,295 @@
+================================================================================
+TASK 2: FINAL SHARED AND SOURCE-SPECIFIC PROPERTY SCHEMA CONTRACT
+================================================================================
+Generated: 2026-03-18
+Plan: place-properties-migration
+Task: 2 - Define the final shared and source-specific property schema contract
+
+================================================================================
+SECTION 1: SHARED COLUMN SET (ALL FOUR PROPERTY TABLES)
+================================================================================
+
+Every `place_*_properties` table (OSM, Google, LLM, User) MUST include these
+columns. They form the aligned contract that enables cross-source resolution.
+
+--------------------------------------------------------------------------------
+1.1 INFRASTRUCTURE / ROW IDENTITY
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+id                  | bigint      | PK, NOT NULL, GEN     | Row identifier
+place_id            | bigint      | FK → places.id, NOT   | Parent place reference
+is_current          | boolean     | NOT NULL, DEFAULT true| Current-row flag
+created_at          | timestamptz | NOT NULL, DEFAULT NOW | Row creation time
+updated_at          | timestamptz | NOT NULL, DEFAULT NOW | Last update time
+
+--------------------------------------------------------------------------------
+1.2 IDENTITY / CONTENT
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+name                | text        | NULL                  | Place display name
+description         | text        | NULL                  | Place description
+place_type          | text        | NULL                  | Canonical place type enum
+source_place_type   | text        | NULL                  | Source-specific place type
+source_categories   | text[]      | NULL                  | Source category tags
+
+--------------------------------------------------------------------------------
+1.3 ADDRESS / LOCATION
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+country_code        | text        | NULL                  | ISO 3166-1 alpha-2 code
+region              | text        | NULL                  | Region/state/province
+city                | text        | NULL                  | City name
+postcode            | text        | NULL                  | Postal/ZIP code
+address             | text        | NULL                  | Full street address
+source_lat          | numeric     | NULL                  | Source-reported latitude
+source_lon          | numeric     | NULL                  | Source-reported longitude
+
+--------------------------------------------------------------------------------
+1.4 CONTACT / OPERATIONS
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+website             | text        | NULL                  | Website URL
+phone               | text        | NULL                  | Phone number
+email               | text        | NULL                  | Email address
+opening_hours       | text        | NULL                  | Opening hours (text)
+fee_info            | text        | NULL                  | Fee/pricing information
+
+--------------------------------------------------------------------------------
+1.5 GENERIC FLAGS
+--------------------------------------------------------------------------------
+Column                  | Type    | Constraints | Description
+------------------------|---------|-------------|-------------------------------
+wheelchair_accessible   | boolean | NULL        | Wheelchair accessibility
+family_friendly         | boolean | NULL        | Family-friendly venue
+pets_allowed            | boolean | NULL        | Pets permitted
+indoor                  | boolean | NULL        | Indoor venue
+outdoor                 | boolean | NULL        | Outdoor venue
+entry_fee_required      | boolean | NULL        | Entry fee required
+reservation_required    | boolean | NULL        | Reservation required
+overnight_stay_allowed  | boolean | NULL        | Overnight stay permitted
+
+--------------------------------------------------------------------------------
+1.6 GENERAL FACILITIES
+--------------------------------------------------------------------------------
+Column              | Type    | Constraints | Description
+--------------------|---------|-------------|-------------------------------
+has_parking         | boolean | NULL        | Parking available
+has_restrooms       | boolean | NULL        | Restrooms available
+has_drinking_water  | boolean | NULL        | Drinking water available
+has_wifi            | boolean | NULL        | WiFi available
+has_shop            | boolean | NULL        | Shop on-site
+has_restaurant      | boolean | NULL        | Restaurant on-site
+has_cafe            | boolean | NULL        | Cafe on-site
+
+--------------------------------------------------------------------------------
+1.7 CAMPING PERMISSIONS
+--------------------------------------------------------------------------------
+Column              | Type    | Constraints | Description
+--------------------|---------|-------------|-------------------------------
+caravan_allowed     | boolean | NULL        | Caravans permitted
+motorhome_allowed   | boolean | NULL        | Motorhomes permitted
+tent_allowed        | boolean | NULL        | Tents permitted
+
+--------------------------------------------------------------------------------
+1.8 CAMPING FACILITIES
+--------------------------------------------------------------------------------
+Column              | Type    | Constraints | Description
+--------------------|---------|-------------|-------------------------------
+has_electricity     | boolean | NULL        | Electrical hookups
+has_fresh_water     | boolean | NULL        | Fresh water hookup
+has_shower          | boolean | NULL        | Shower facilities
+has_laundry         | boolean | NULL        | Laundry facilities
+has_dishwashing_area| boolean | NULL        | Dishwashing area
+
+--------------------------------------------------------------------------------
+1.9 DISPOSAL / UTILITIES
+--------------------------------------------------------------------------------
+Column                      | Type    | Constraints | Description
+----------------------------|---------|-------------|-------------------------------
+has_grey_water_disposal     | boolean | NULL        | Grey water disposal
+has_black_water_disposal    | boolean | NULL        | Black water disposal
+has_chemical_toilet_disposal| boolean | NULL        | Chemical toilet disposal
+has_dump_station            | boolean | NULL        | Dump station
+has_waste_disposal          | boolean | NULL        | General waste disposal
+has_recycling               | boolean | NULL        | Recycling facilities
+
+--------------------------------------------------------------------------------
+1.10 LEISURE
+--------------------------------------------------------------------------------
+Column              | Type    | Constraints | Description
+--------------------|---------|-------------|-------------------------------
+has_bbq_area        | boolean | NULL        | BBQ area
+has_fire_pit        | boolean | NULL        | Fire pit
+has_playground      | boolean | NULL        | Playground
+has_pool            | boolean | NULL        | Swimming pool
+has_beach           | boolean | NULL        | Beach access
+
+--------------------------------------------------------------------------------
+1.11 NUDISM
+--------------------------------------------------------------------------------
+Column              | Type    | Constraints | Description
+--------------------|---------|-------------|-------------------------------
+nudism_allowed      | boolean | NULL        | Nudism permitted
+nudism_only         | boolean | NULL        | Nudism-only venue
+
+--------------------------------------------------------------------------------
+1.12 ATTRACTION / MUSEUM
+--------------------------------------------------------------------------------
+Column              | Type    | Constraints | Description
+--------------------|---------|-------------|-------------------------------
+has_guided_tours    | boolean | NULL        | Guided tours available
+has_audio_guide     | boolean | NULL        | Audio guide available
+has_visitor_center  | boolean | NULL        | Visitor center
+has_lockers         | boolean | NULL        | Lockers available
+photography_allowed | boolean | NULL        | Photography permitted
+
+================================================================================
+SECTION 2: SOURCE-SPECIFIC COLUMNS
+================================================================================
+
+Each property table adds source-specific columns ON TOP of the shared set.
+
+--------------------------------------------------------------------------------
+2.1 OSM PROPERTIES (place_osm_properties)
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+osm_source_id       | bigint      | NULL                  | FK to osm_source.id
+osm_id              | bigint      | NULL                  | OSM object ID
+osm_type            | text        | NULL                  | OSM object type (node/way/relation)
+osm_version         | integer     | NULL                  | OSM version number
+osm_timestamp       | timestamptz | NULL                  | OSM last edit timestamp
+
+--------------------------------------------------------------------------------
+2.2 GOOGLE PROPERTIES (place_google_properties)
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+google_source_id    | bigint      | NULL                  | FK to place_google_sources.id
+google_place_id     | text        | NULL                  | Google Places API ID
+rating              | numeric     | NULL                  | Google rating (0-5)
+review_count        | integer     | NULL                  | Number of Google reviews
+business_status     | text        | NULL                  | Business status enum
+expires_at          | timestamptz | NULL                  | Cache expiration time
+
+--------------------------------------------------------------------------------
+2.3 LLM PROPERTIES (place_llm_properties)
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+llm_enrichment_id   | bigint      | NULL                  | FK to place_llm_enrichments.id
+provider            | text        | NULL                  | LLM provider (openai/anthropic)
+model               | text        | NULL                  | Model identifier
+summary_de          | text        | NULL                  | German-language summary
+trust_score         | numeric     | NULL                  | Trust score (0-1)
+source_urls         | jsonb       | NULL                  | Array of source URLs
+
+--------------------------------------------------------------------------------
+2.4 USER PROPERTIES (place_user_properties)
+--------------------------------------------------------------------------------
+Column              | Type        | Constraints           | Description
+--------------------|-------------|-----------------------|---------------------------
+user_id             | uuid        | FK → profiles.id, NOT | User who submitted correction
+
+================================================================================
+SECTION 3: BOOLEAN SEMANTICS
+================================================================================
+
+CRITICAL RULE: NULL vs FALSE
+
+For ALL boolean property columns across ALL four tables:
+
+  NULL  = The source made NO CLAIM about this property.
+          The source did not mention it, did not assert it, did not deny it.
+          This is the DEFAULT state for all boolean columns.
+
+  FALSE = The source EXPLICITLY DENIED this property.
+          The source stated this feature is NOT present or NOT allowed.
+          This requires affirmative evidence from the source.
+
+  TRUE  = The source EXPLICITLY CONFIRMED this property.
+          The source stated this feature IS present or IS allowed.
+
+IMPLICATIONS:
+- Boolean columns MUST be nullable (no NOT NULL constraint)
+- Boolean columns MUST NOT have DEFAULT false
+- Backfill logic MUST preserve NULL when source has no claim
+- Read resolution MUST distinguish "unknown" (NULL) from "no" (false)
+
+EXAMPLES:
+  OSM tags say "toilets=yes"    → has_restrooms = TRUE
+  OSM tags say "toilets=no"     → has_restrooms = FALSE
+  OSM tags do not mention toilets → has_restrooms = NULL
+
+  Google amenities list "Restroom" → has_restrooms = TRUE
+  Google amenities do not list it  → has_restrooms = NULL (NOT false)
+
+  LLM summary says "no WiFi"    → has_wifi = FALSE
+  LLM summary says "free WiFi"  → has_wifi = TRUE
+  LLM summary doesn't mention   → has_wifi = NULL
+
+================================================================================
+SECTION 4: CURRENT-ROW SEMANTICS
+================================================================================
+
+OSM/Google/LLM Properties:
+- ONE current row per place_id
+- Enforced via partial unique index: WHERE is_current = true
+- When new data arrives, set old row is_current=false, insert new row is_current=true
+
+User Properties:
+- ONE current row per (place_id, user_id)
+- Enforced via partial unique index: WHERE is_current = true
+- Each user can submit multiple corrections over time; only latest is current
+
+================================================================================
+SECTION 5: READ RESOLUTION PRIORITY
+================================================================================
+
+When multiple sources provide data for the same field, resolve in this order:
+
+  1. User properties (highest priority - human correction)
+  2. OSM properties (community-verified data)
+  3. Google properties (commercial API data)
+  4. LLM properties (lowest priority - AI-generated)
+
+This priority applies to ALL shared columns unless a consumer explicitly
+overrides for a specific use case.
+
+================================================================================
+SECTION 6: TABLE COUNT VERIFICATION
+================================================================================
+
+Shared columns: 55 columns
+  - Infrastructure: 5
+  - Identity/Content: 5
+  - Address/Location: 7
+  - Contact/Operations: 5
+  - Generic Flags: 8
+  - General Facilities: 7
+  - Camping Permissions: 3
+  - Camping Facilities: 5
+  - Disposal/Utilities: 6
+  - Leisure: 5
+  - Nudism: 2
+  - Attraction/Museum: 5
+
+Source-specific additions:
+  - OSM: 5 columns
+  - Google: 6 columns
+  - LLM: 6 columns
+  - User: 1 column
+
+Total per table:
+  - place_osm_properties: 60 columns (55 shared + 5 OSM)
+  - place_google_properties: 61 columns (55 shared + 6 Google)
+  - place_llm_properties: 61 columns (55 shared + 6 LLM)
+  - place_user_properties: 56 columns (55 shared + 1 User)
+
+================================================================================
+END OF TASK 2 SCHEMA CONTRACT
+================================================================================

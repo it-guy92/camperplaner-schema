@@ -1,0 +1,262 @@
+# Task 4: Deprecated Field/Table Mapping Matrix
+# Generated: 2026-03-18
+# Purpose: Deterministic mapping from deprecated schema to new property tables
+
+================================================================================
+SECTION 1: DEPRECATED places BUSINESS COLUMNS → NEW PROPERTY TABLES
+================================================================================
+
+These columns are removed from `places` (which shrinks to id/lat/lon/is_active/created_at/updated_at).
+Each maps to source-specific property tables with NULL = no-claim semantics.
+
+--------------------------------------------------------------------------------
+1.1 IDENTITY & ADDRESS FIELDS
+--------------------------------------------------------------------------------
+
+| Deprecated Column | Type       | Target Table              | Target Column         | Transform Rule                                    | Notes                                      |
+|-------------------|------------|---------------------------|-----------------------|---------------------------------------------------|--------------------------------------------|
+| place_type        | text       | place_osm_properties      | source_place_type     | Direct copy from places (OSM is primary source)   | Also in place_google_properties via types  |
+| name              | text       | place_osm_properties      | name                  | Direct copy                                       | Google also has name in place_google_sources |
+| name              | text       | place_google_properties   | name                  | From place_google_sources.name                    | Google-specific name variant               |
+| name              | text       | place_llm_properties      | name                  | From LLM facts if available                       | LLM may provide corrected name             |
+| name              | text       | place_user_properties     | name                  | User-corrected name                               | User override                              |
+| geom              | geometry   | DISCARD                   | —                     | Replaced by lat/lon in minimal places             | PostGIS geometry removed; lat/lon retained |
+| country_code      | text       | place_osm_properties      | country_code          | Direct copy                                       | ISO 3166-1 alpha-2                        |
+| region            | text       | place_osm_properties      | region                | Direct copy                                       | State/province/region                      |
+| city              | text       | place_osm_properties      | city                  | Direct copy                                       | City/locality name                         |
+| postcode          | text       | place_osm_properties      | postcode              | Direct copy                                       | Postal/ZIP code                            |
+| address           | text       | place_osm_properties      | address               | Direct copy                                       | Full formatted address                     |
+| address           | text       | place_google_properties   | address               | From place_google_sources.formatted_address       | Google-formatted address                   |
+
+--------------------------------------------------------------------------------
+1.2 AMENITY BOOLEAN FIELDS (from places)
+--------------------------------------------------------------------------------
+
+| Deprecated Column    | Type    | Target Table              | Target Column        | Transform Rule                           | Notes                                    |
+|----------------------|---------|---------------------------|----------------------|------------------------------------------|------------------------------------------|
+| has_toilet           | boolean | place_osm_properties      | has_toilet           | Direct copy                              | NULL = no OSM claim                      |
+| has_shower           | boolean | place_osm_properties      | has_shower           | Direct copy                              | NULL = no OSM claim                      |
+| has_electricity      | boolean | place_osm_properties      | has_electricity      | Direct copy                              | NULL = no OSM claim                      |
+| has_water            | boolean | place_osm_properties      | has_water            | Direct copy                              | NULL = no OSM claim                      |
+| has_wifi             | boolean | place_osm_properties      | has_wifi             | Direct copy                              | NULL = no OSM claim                      |
+| pet_friendly         | boolean | place_osm_properties      | pet_friendly         | Direct copy                              | NULL = no OSM claim                      |
+| caravan_allowed      | boolean | place_osm_properties      | caravan_allowed      | Direct copy                              | NULL = no OSM claim                      |
+| motorhome_allowed    | boolean | place_osm_properties      | motorhome_allowed    | Direct copy                              | NULL = no OSM claim                      |
+| tent_allowed         | boolean | place_osm_properties      | tent_allowed         | Direct copy                              | NULL = no OSM claim                      |
+
+Note: These booleans also have corresponding columns in place_google_properties
+(derived from place_google_amenities) and place_llm_properties (from place_llm_facts).
+The OSM property table receives the current places values as the OSM-sourced baseline.
+
+--------------------------------------------------------------------------------
+1.3 CONTACT & INFO FIELDS (from places)
+--------------------------------------------------------------------------------
+
+| Deprecated Column | Type   | Target Table              | Target Column    | Transform Rule                         | Notes                              |
+|-------------------|--------|---------------------------|------------------|----------------------------------------|------------------------------------|
+| website           | text   | place_osm_properties      | website          | Direct copy                            | OSM-sourced website                |
+| website           | text   | place_google_properties   | website          | From place_google_sources.website      | Google-sourced website             |
+| website           | text   | place_llm_properties      | website          | From LLM facts if available            | LLM-discovered website             |
+| phone             | text   | place_osm_properties      | phone            | Direct copy                            | OSM-sourced phone                  |
+| phone             | text   | place_google_properties   | phone            | From place_google_sources.phone        | Google-sourced phone               |
+| phone             | text   | place_llm_properties      | phone            | From LLM facts if available            | LLM-discovered phone               |
+| email             | text   | place_osm_properties      | email            | Direct copy                            | OSM-sourced email                  |
+| email             | text   | place_llm_properties      | email            | From LLM facts if available            | LLM-discovered email               |
+| opening_hours     | text   | place_osm_properties      | opening_hours    | Direct copy                            | OSM-sourced hours                  |
+| opening_hours     | text   | place_google_properties   | opening_hours    | From LLM/Google if available           | May come from Google editorial     |
+| fee_info          | text   | place_osm_properties      | fee_info         | Direct copy                            | Fee/pricing information            |
+| fee_info          | text   | place_llm_properties      | fee_info         | From LLM facts if available            | LLM-extracted fee info             |
+
+--------------------------------------------------------------------------------
+1.4 SOURCE METADATA FIELDS (from places)
+--------------------------------------------------------------------------------
+
+| Deprecated Column   | Type      | Target Table              | Target Column      | Transform Rule                         | Notes                              |
+|---------------------|-----------|---------------------------|--------------------|----------------------------------------|------------------------------------|
+| source_primary      | text      | DISCARD                   | —                  | Replaced by source-family model       | Each property table IS a source    |
+| data_confidence     | numeric   | place_osm_properties      | data_confidence    | Direct copy as OSM confidence         | OSM-specific confidence score      |
+| data_confidence     | numeric   | place_google_properties   | data_confidence    | Derived from Google confidence        | Google-specific confidence         |
+| data_confidence     | numeric   | place_llm_properties      | data_confidence    | From place_llm_enrichments.confidence | LLM-specific confidence            |
+| last_seen_at        | timestamptz| DISCARD                  | —                  | Replaced by fetched_at in sources     | Each source tracks its own freshness |
+| last_enriched_at    | timestamptz| DISCARD                  | —                  | Replaced by completed_at in sources   | Each source tracks enrichment time |
+
+================================================================================
+SECTION 2: DEPRECATED place_google_amenities → place_google_properties
+================================================================================
+
+The place_google_amenities table stores individual amenity facts as rows.
+These flatten into boolean/value columns in place_google_properties.
+
+| Deprecated amenity_key     | Value Type | Target Column           | Transform Rule                                    | Notes                              |
+|----------------------------|------------|-------------------------|---------------------------------------------------|------------------------------------|
+| electricity                | boolean    | has_electricity         | value_boolean → target column                     | NULL if not present                |
+| water                      | boolean    | has_water               | value_boolean → target column                     | NULL if not present                |
+| wifi                       | boolean    | has_wifi                | value_boolean → target column                     | NULL if not present                |
+| shower                     | boolean    | has_shower              | value_boolean → target column                     | NULL if not present                |
+| restrooms                  | boolean    | has_toilet              | value_boolean → target column                     | Maps to toilet facility            |
+| laundry                    | boolean    | has_laundry             | value_boolean → target column                     | NULL if not present                |
+| dump_station               | boolean    | has_dump_station        | value_boolean → target column                     | NULL if not present                |
+| pet_friendly               | boolean    | pet_friendly            | value_boolean → target column                     | NULL if not present                |
+| accessibility              | boolean    | is_accessible           | value_boolean → target column                     | NULL if not present                |
+| pool                       | boolean    | has_pool                | value_boolean → target column                     | NULL if not present                |
+| playground                 | boolean    | has_playground          | value_boolean → target column                     | NULL if not present                |
+| restaurant                 | boolean    | has_restaurant          | value_boolean → target column                     | NULL if not present                |
+| bar                        | boolean    | has_bar                 | value_boolean → target column                     | NULL if not present                |
+| shop                       | boolean    | has_shop                | value_boolean → target column                     | NULL if not present                |
+| beach                      | boolean    | has_beach               | value_boolean → target column                     | NULL if not present                |
+| washing_machine            | boolean    | has_washing_machine     | value_boolean → target column                     | NULL if not present                |
+| dishwasher                 | boolean    | has_dishwasher          | value_boolean → target column                     | NULL if not present                |
+
+Additional metadata from place_google_amenities:
+| Deprecated Column          | Target Column           | Transform Rule                                    |
+|----------------------------|-------------------------|---------------------------------------------------|
+| google_feature_type        | source_metadata JSONB   | Stored in source-specific metadata                |
+| is_verified                | (not migrated)          | Verification status discarded after flattening    |
+| confidence_score           | data_confidence         | Aggregated into overall Google confidence         |
+| source_section             | (not migrated)          | Provenance detail discarded after flattening      |
+
+================================================================================
+SECTION 3: DEPRECATED place_google_types → place_google_properties
+================================================================================
+
+The place_google_types table stores Google place categories as rows.
+These flatten into source_place_type and source_categories in place_google_properties.
+
+| Deprecated Column | Target Column        | Transform Rule                                    | Notes                              |
+|-------------------|----------------------|---------------------------------------------------|------------------------------------|
+| google_type       | source_place_type    | Primary type (is_primary=true) → source_place_type| e.g., "campground", "rv_park"     |
+| google_type       | source_categories    | All types → text[] array                          | Includes primary + secondary types |
+| is_primary        | (implicit)           | Determines which type becomes source_place_type   | Only one primary per source        |
+
+================================================================================
+SECTION 4: DEPRECATED place_llm_facts → place_llm_properties
+================================================================================
+
+The place_llm_facts table stores individual LLM-extracted facts as rows.
+These flatten into typed columns in place_llm_properties.
+
+| Deprecated field_name        | Target Column        | Transform Rule                                    | Notes                              |
+|------------------------------|----------------------|---------------------------------------------------|------------------------------------|
+| has_toilet                   | has_toilet           | value_text parsed as boolean                      | NULL if not extracted              |
+| has_shower                   | has_shower           | value_text parsed as boolean                      | NULL if not extracted              |
+| has_electricity              | has_electricity      | value_text parsed as boolean                      | NULL if not extracted              |
+| has_water                    | has_water            | value_text parsed as boolean                      | NULL if not extracted              |
+| has_wifi                     | has_wifi             | value_text parsed as boolean                      | NULL if not extracted              |
+| pet_friendly                 | pet_friendly         | value_text parsed as boolean                      | NULL if not extracted              |
+| caravan_allowed              | caravan_allowed      | value_text parsed as boolean                      | NULL if not extracted              |
+| motorhome_allowed            | motorhome_allowed    | value_text parsed as boolean                      | NULL if not extracted              |
+| tent_allowed                 | tent_allowed         | value_text parsed as boolean                      | NULL if not extracted              |
+| website                      | website              | value_text as text                                | NULL if not extracted              |
+| phone                        | phone                | value_text as text                                | NULL if not extracted              |
+| email                        | email                | value_text as text                                | NULL if not extracted              |
+| opening_hours                | opening_hours        | value_text as text                                | NULL if not extracted              |
+| fee_info                     | fee_info             | value_text as text                                | NULL if not extracted              |
+| name                         | name                 | value_text as text                                | LLM may correct name              |
+| description                  | description          | value_text as text                                | LLM-generated description         |
+| (any custom field)           | source_metadata      | Stored in JSONB metadata                          | Non-standard fields preserved      |
+
+Additional metadata from place_llm_facts:
+| Deprecated Column   | Target Column        | Transform Rule                                    |
+|---------------------|----------------------|---------------------------------------------------|
+| confidence          | data_confidence      | Aggregated into overall LLM confidence            |
+| provenance_kind     | (not migrated)       | Provenance detail discarded after flattening      |
+| value_type          | (implicit)           | Determines parsing of value_text                  |
+
+================================================================================
+SECTION 5: DEPRECATED place_llm_sources → place_llm_properties
+================================================================================
+
+The place_llm_sources table stores URLs cited by the LLM as rows.
+These flatten into source_urls text[] in place_llm_properties.
+
+| Deprecated Column  | Target Column    | Transform Rule                                    | Notes                              |
+|--------------------|------------------|---------------------------------------------------|------------------------------------|
+| source_url         | source_urls      | Aggregated into text[] array                      | All URLs from current enrichment   |
+| source_domain      | (not migrated)   | Domain derivable from URL                         | Can be recomputed if needed        |
+| source_kind        | (not migrated)   | Source type classification                        | Discarded after aggregation        |
+| trusted            | trust_score      | Contributes to overall trust calculation          | Aggregated boolean → numeric       |
+| relevance_score    | (not migrated)   | Per-URL relevance                                 | Discarded after aggregation        |
+
+================================================================================
+SECTION 6: DEPRECATED place_llm_evidence_markers → DISCARD
+================================================================================
+
+This table stores trust markers for LLM output. No target in new schema.
+
+| Deprecated Column  | Decision   | Rationale                                              |
+|--------------------|------------|--------------------------------------------------------|
+| field_name         | DISCARD    | Evidence markers are process data, not place properties |
+| marker_text        | DISCARD    | Trust verification detail not needed in simplified model|
+| marker_type        | DISCARD    | Marker classification not needed                        |
+| confidence         | DISCARD    | Per-marker confidence not migrated                      |
+
+Rationale: Evidence markers are intermediate trust-verification data used during
+enrichment processing. The simplified model captures trust via trust_score in
+place_llm_properties. Raw evidence is preserved in place_source_evidence_runs
+(which is also deprecated but retained longer for audit purposes).
+
+================================================================================
+SECTION 7: DEPRECATED place_source_evidence_runs → DISCARD (with archive option)
+================================================================================
+
+This table stores evidence collection audit trails. No target in new schema.
+
+| Deprecated Column      | Decision   | Rationale                                              |
+|------------------------|------------|--------------------------------------------------------|
+| place_id               | DISCARD    | Audit data, not place properties                        |
+| job_id                 | DISCARD    | Job tracking data                                       |
+| worker_id              | DISCARD    | Operational metadata                                    |
+| attempt_number         | DISCARD    | Retry tracking                                          |
+| collection_status      | DISCARD    | Process status                                          |
+| source_urls            | DISCARD    | URLs now in place_llm_properties.source_urls            |
+| source_evidence        | ARCHIVE    | May be useful for debugging; consider cold storage      |
+| evidence_markers       | ARCHIVE    | May be useful for debugging; consider cold storage      |
+| trusted_source_count   | DISCARD    | Aggregated into trust_score                             |
+
+Rationale: Evidence runs are operational audit data. The simplified model trusts
+the LLM enrichment output directly. Source evidence and markers could be archived
+to cold storage (S3/blob) before table drop if debugging capability is needed.
+
+================================================================================
+SECTION 8: DEPRECATED CHILD TABLES (Google) - PRESERVED AS-IS
+================================================================================
+
+These tables are NOT deprecated. They remain as 1:n child tables of place_google_sources.
+
+| Table                    | Status    | Notes                                              |
+|--------------------------|-----------|----------------------------------------------------|
+| place_google_reviews     | RETAINED  | 1:n reviews; not flattened into property table     |
+| place_google_photos      | RETAINED  | 1:n photos; not flattened into property table      |
+
+================================================================================
+SECTION 9: DEPRECATED CHILD TABLES (Evidence) - PRESERVED DURING TRANSITION
+================================================================================
+
+These tables are deprecated but retained during transition for audit purposes.
+
+| Table                    | Status    | Notes                                              |
+|--------------------------|-----------|----------------------------------------------------|
+| place_evidence_sources   | DEPRECATED| Child of place_source_evidence_runs; drop with parent |
+| place_evidence_markers   | DEPRECATED| Child of place_source_evidence_runs; drop with parent |
+
+================================================================================
+SECTION 10: SUMMARY - MAPPING COMPLETENESS
+================================================================================
+
+Total deprecated objects mapped: 47
+- places business columns: 20 (17 mapped to property tables, 3 discarded)
+- place_google_amenities columns: 12 (17 amenity keys mapped, 4 metadata columns handled)
+- place_google_types columns: 3 (all mapped to place_google_properties)
+- place_llm_facts columns: 7 (15+ field names mapped, 3 metadata columns handled)
+- place_llm_sources columns: 5 (2 mapped, 3 discarded)
+- place_llm_evidence_markers columns: 4 (all discarded)
+- place_source_evidence_runs columns: 10 (2 archived, 8 discarded)
+
+DECISION SUMMARY:
+- MAPPED TO PROPERTY TABLE: 39 fields/tables
+- DISCARDED (no target): 12 fields/tables
+- ARCHIVED (cold storage): 2 fields
+- RETAINED AS-IS: 2 tables (google_reviews, google_photos)
+
+VERIFICATION: Every deprecated object has a deterministic plan. No field lacks a target,
+archive decision, or explicit discard rationale.

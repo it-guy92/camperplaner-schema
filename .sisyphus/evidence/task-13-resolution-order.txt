@@ -1,0 +1,219 @@
+# Task 13: Resolution Priority Order Specification
+# Generated: 2026-03-18
+# Purpose: Define deterministic field resolution for campsite_full view
+
+================================================================================
+SECTION 1: RESOLUTION PRIORITY HIERARCHY
+================================================================================
+
+Priority Order (highest to lowest):
+  1. User (place_user_properties) - Human corrections, highest trust
+  2. OSM (place_osm_properties) - Community-verified data
+  3. Google (place_google_properties) - Commercial source
+  4. LLM (place_llm_properties) - AI-generated, lowest trust
+
+Rationale (from D9):
+- Human corrections override all automated sources
+- Community-verified data (OSM) preferred over commercial (Google)
+- AI-generated data (LLM) lowest priority due to hallucination risk
+
+================================================================================
+SECTION 2: RESOLUTION ALGORITHM
+================================================================================
+
+For each business field F:
+
+  resolved_F = COALESCE(
+    user.F,      -- Priority 1: User correction (NULL if no user claim)
+    osm.F,       -- Priority 2: OSM source (NULL if no OSM claim)
+    google.F,    -- Priority 3: Google source (NULL if no Google claim)
+    llm.F,       -- Priority 4: LLM source (NULL if no LLM claim)
+    false        -- Final fallback for amenity booleans only
+  )
+
+NULL Semantics:
+- If a source has no claim for field F, its value is NULL
+- COALESCE skips NULLs, falling to next priority
+- If ALL sources are NULL, amenity fields default to FALSE
+- Non-amenity fields (name, address, etc.) remain NULL if all sources NULL
+
+================================================================================
+SECTION 3: FIELD CATEGORIES
+================================================================================
+
+3.1 AMENITY BOOLEAN FIELDS (16 fields)
+---------------------------------------
+These fields resolve via full 4-source COALESCE with FALSE fallback:
+
+  has_toilet, has_shower, has_electricity, has_dogs_allowed, has_wifi,
+  has_beach, has_laundry, has_restaurant, has_bar, has_shop, has_pool,
+  has_playground, has_dump_station, has_water, has_washing_machine, has_dishwasher
+
+Resolution:
+  COALESCE(up.field, op.field, gp.field, lp.field, false)
+
+3.2 IDENTITY / CONTENT FIELDS (3 fields)
+-----------------------------------------
+These fields resolve via 4-source COALESCE with NULL fallback:
+
+  name, place_type, source_place_type
+
+Resolution:
+  COALESCE(up.field, op.field, gp.field, lp.field)
+
+3.3 ADDRESS / LOCATION FIELDS (5 fields)
+-----------------------------------------
+These fields resolve via 4-source COALESCE with NULL fallback:
+
+  country_code, region, city, postcode, address
+
+Resolution:
+  COALESCE(up.field, op.field, gp.field, lp.field)
+
+3.4 CONTACT / OPERATIONS FIELDS (4 fields)
+-------------------------------------------
+These fields resolve via 4-source COALESCE with NULL fallback:
+
+  website, phone, email, opening_hours
+
+Resolution:
+  COALESCE(up.field, op.field, gp.field, lp.field)
+
+3.5 SOURCE-SPECIFIC FIELDS (not resolved)
+------------------------------------------
+These fields come from specific sources only:
+
+  osm_id, osm_type, osm_version, osm_timestamp → from place_osm_properties only
+  google_place_id, rating, review_count → from place_google_properties only
+  llm_enrichment_id, provider, model, trust_score → from place_llm_properties only
+
+================================================================================
+SECTION 4: COLUMN NAME MAPPING (property table → view)
+================================================================================
+
+Property tables use ALIGNED naming. View uses LEGACY naming.
+Mapping required for 5 columns:
+
+| Property Table Column | View Column        | Direction               |
+|-----------------------|--------------------|-------------------------|
+| has_restrooms         | has_toilet         | Property → View rename  |
+| has_drinking_water    | has_water          | Property → View rename  |
+| pets_allowed          | has_dogs_allowed   | Property → View rename  |
+| has_cafe              | has_bar            | Property → View rename  |
+| has_dishwashing_area  | has_dishwasher     | Property → View rename  |
+
+All other columns have identical names in both schemas.
+
+================================================================================
+SECTION 5: SPECIAL CASES
+================================================================================
+
+5.1 has_washing_machine
+-----------------------
+View has: has_washing_machine
+Property tables have: has_laundry (laundry and washing_machine merged per D29)
+
+Resolution:
+  has_washing_machine = COALESCE(up.has_laundry, op.has_laundry, gp.has_laundry, lp.has_laundry, false)
+
+Note: has_laundry and has_washing_machine in the view will have IDENTICAL values.
+This is intentional - both represent laundry/washing facilities.
+
+5.2 location (composite field)
+------------------------------
+View has: location (computed from city, region, country_code, address)
+Property tables have: city, region, country_code, address (separate columns)
+
+Resolution:
+  location = COALESCE(
+    NULLIF(TRIM(CONCAT_WS(', ',
+      COALESCE(up.city, op.city, gp.city, lp.city),
+      COALESCE(up.region, op.region, gp.region, lp.region),
+      COALESCE(up.country_code, op.country_code, gp.country_code, lp.country_code)
+    )), ''),
+    COALESCE(up.address, op.address, gp.address, lp.address),
+    COALESCE(up.name, op.name, gp.name, lp.name)
+  )
+
+5.3 type (derived field)
+------------------------
+View has: type ('camping', 'stellplatz', 'poi')
+Property tables have: place_type ('camp_site', 'camper_stop', etc.)
+
+Resolution:
+  type = CASE
+    WHEN COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type) = 'camp_site' THEN 'camping'
+    WHEN COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type) = 'camper_stop' THEN 'stellplatz'
+    ELSE 'poi'
+  END
+
+5.4 osm_tags (composite JSONB)
+------------------------------
+View has: osm_tags (JSONB object)
+Property tables have: individual columns
+
+Resolution:
+  osm_tags = jsonb_build_object(
+    'source_place_type', COALESCE(up.source_place_type, op.source_place_type, gp.source_place_type, lp.source_place_type),
+    'place_type', COALESCE(up.place_type, op.place_type, gp.place_type, lp.place_type),
+    'country_code', COALESCE(up.country_code, op.country_code, gp.country_code, lp.country_code),
+    'city', COALESCE(up.city, op.city, gp.city, lp.city)
+  )
+
+================================================================================
+SECTION 6: CONSISTENCY VERIFICATION
+================================================================================
+
+The resolution priority is applied CONSISTENTLY across ALL fields:
+
+1. Every business field uses the SAME priority order: user → OSM → Google → LLM
+2. No field uses a different priority or skips a source
+3. NULL semantics preserved: NULL = no claim, not FALSE
+4. Final FALSE fallback only for amenity booleans (explicit design choice)
+5. Column name mapping is deterministic and auditable
+
+Verification Query (conceptual):
+  SELECT
+    place_id,
+    -- All amenity fields should resolve from same source if that source has claims
+    has_toilet_source = has_shower_source AS consistent_resolution
+  FROM campsite_full;
+
+================================================================================
+SECTION 7: EDGE CASES
+================================================================================
+
+7.1 All sources NULL for a field
+---------------------------------
+Result: Amenity booleans → FALSE, other fields → NULL
+Rationale: Amenities default to absent (safe assumption); other fields remain unknown
+
+7.2 User corrects only SOME fields
+-----------------------------------
+Result: User-corrected fields use user value; uncorrected fields fall through to OSM/Google/LLM
+Rationale: Partial corrections supported (per Task 11 findings)
+
+7.3 No property tables have data for a place
+---------------------------------------------
+Result: All business fields resolve to NULL (except amenities → FALSE)
+Rationale: Place exists but has no enriched data yet
+
+7.4 Conflicting claims across sources
+--------------------------------------
+Example: OSM says has_wifi=true, Google says has_wifi=false
+Result: OSM wins (higher priority)
+Rationale: Deterministic priority prevents ambiguity
+
+================================================================================
+SECTION 8: EVIDENCE ARTIFACTS
+================================================================================
+
+This file: .sisyphus/evidence/task-13-resolution-order.txt
+Companion: .sisyphus/evidence/task-13-view-cutover.txt (full view SQL)
+
+Both files together provide complete specification for:
+- View column mapping
+- Resolution priority
+- Column name translation
+- Edge case handling
+- Verification approach

@@ -1,0 +1,250 @@
+# Task 17: Downstream Sync and Consumer Migration Sequence
+
+## Overview
+This file documents the explicit sequencing for downstream artifact synchronization across schema repo, product, and worker consumers. It defines who does what, when, and in what order for each migration phase.
+
+---
+
+## Repository Roles and Responsibilities
+
+| Repository | Role | Executes Migrations | Syncs Types | Owns Schema |
+|------------|------|---------------------|-------------|--------------|
+| camperplaner-schema | PRODUCER | No (provides only) | Yes (generates) | Yes (single source) |
+| camperplaner-product | CONSUMER | Yes (staging/prod) | Yes (copies) | No |
+| camperplaner-worker | CONSUMER | No (read-only) | Yes (copies) | No |
+
+---
+
+## Sync Commands (Per AGENTS.md)
+
+### Product Repo Sync
+```bash
+cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
+```
+
+### Worker Repo Sync
+```bash
+cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
+```
+
+### Timing Contract
+- **Expected:** Within 1 business day of schema merge (per AGENTS.md)
+- **Critical:** Types must sync BEFORE consumer code uses new schema
+
+---
+
+## Phase 1: Additive (New Tables/Columns)
+
+### Sequence
+
+| Step | Actor | Action | Timing |
+|------|-------|--------|--------|
+| 1 | Schema Repo | Create migration (adds tables/columns) | Day 0 |
+| 2 | Schema Repo | Merge PR to main | Day 0 |
+| 3 | Product | Execute migration in staging | Day 0 |
+| 4 | Product | Verify migration (check tables exist) | Day 0 |
+| 5 | Product | Wait for PostgREST cache refresh (30-60s) | Day 0 |
+| 6 | Schema Repo | Regenerate types: `supabase gen types --local > generated/database.types.ts` | Day 0 |
+| 7 | Schema Repo | Commit regenerated types to main | Day 0 |
+| 8 | Product | Sync types: `cp -r ../camperplaner-schema/generated/* apps/web/src/lib/` | Day 1 |
+| 9 | Product | Update code to use new tables/columns | Day 1 |
+| 10 | Worker | Sync types: `cp ../camperplaner-schema/generated/database.types.ts src/types/` | Day 1 |
+| 11 | Worker | Update code to write to new tables/columns | Day 1 |
+
+### Downstream Communication
+
+Product must signal readiness to worker:
+- When: After Step 4 (migration verified)
+- How: Issue mention or PR comment in worker repo
+- Content: "Schema deployed, new tables visible: place_osm_properties, place_google_properties"
+
+### Code Change Gate
+
+- Product must update code BEFORE worker deploys
+- Worker must NOT deploy until product signals migration complete
+- Both must compile with new types before merge
+
+---
+
+## Phase 2: Transition (Views/RPC Updates)
+
+### Sequence
+
+| Step | Actor | Action | Timing |
+|------|-------|--------|--------|
+| 1 | Schema Repo | Create migration (rewrites views, updates functions) | Day 0 |
+| 2 | Schema Repo | Merge PR to main | Day 0 |
+| 3 | Product | Execute migration in staging | Day 0 |
+| 4 | Product | Verify migration (test queries against views) | Day 0 |
+| 5 | Schema Repo | Regenerate types | Day 0 |
+| 6 | Schema Repo | Commit regenerated types to main | Day 0 |
+| 7 | Product | Sync types | Day 1 |
+| 8 | Product | Run test suite (verify view queries work) | Day 1 |
+| 9 | Worker | Sync types | Day 1 |
+| 10 | Worker | Run test suite (verify RPC calls work) | Day 1 |
+
+### Downstream Communication
+
+Product must provide view update notes:
+- Which views changed
+- Any new required parameters
+- Breaking changes to return shape
+
+### Test Gate
+
+- Product test suite MUST pass before worker deploys
+- Worker test suite MUST pass after sync
+- Both must succeed before declaring Phase 2 complete
+
+---
+
+## Phase 3: Cleanup (Drop Deprecated Objects)
+
+### Sequence
+
+| Step | Actor | Action | Timing |
+|------|-------|--------|--------|
+| 1 | Schema Repo | Verify evidence artifacts exist (row counts, FK audit) | Day 0 |
+| 2 | Schema Repo | Verify 24-hour observation window passed | Day 0 |
+| 3 | Schema Repo | Verify product/worker migration complete | Day 0 |
+| 4 | Schema Repo | Create migration (drops deprecated columns/tables) | Day 0 |
+| 5 | Schema Repo | Merge PR to main | Day 0 |
+| 6 | Product | Execute migration in staging | Day 0 |
+| 7 | Product | Verify deprecated columns gone | Day 0 |
+| 8 | Schema Repo | Regenerate types | Day 0 |
+| 9 | Schema Repo | Commit regenerated types | Day 0 |
+| 10 | Product | Sync types | Day 1 |
+| 11 | Product | Remove old field references from code | Day 1 |
+| 12 | Worker | Sync types | Day 1 |
+| 13 | Worker | Remove old field references from code | Day 1 |
+
+### Cleanup Gate (CRITICAL)
+
+Phase 3 CANNOT proceed until:
+1. Evidence artifacts exist (per Task 6 rules)
+2. Product has migrated all code away from deprecated fields
+3. Worker has migrated all code away from deprecated fields
+4. 24-hour observation window has passed since Phase 2
+
+### Downstream Communication
+
+Before Phase 3:
+- Product signals: "All deprecated field references removed"
+- Worker signals: "All deprecated field references removed"
+- Both must confirm before schema repo proceeds
+
+### Code Removal Gate
+
+- Product MUST remove deprecated field usage BEFORE schema drops
+- Worker MUST remove deprecated field usage BEFORE schema drops
+- If either has code still referencing deprecated fields, Phase 3 BLOCKED
+
+---
+
+## Consumer Cutover Checklist
+
+### Before Each Phase
+
+| Item | Product | Worker | Schema Repo |
+|------|---------|--------|-------------|
+| Migration file present | - | - | Required |
+| Migration tested in staging | Required | - | - |
+| Types regenerated | - | - | Required |
+| Types synced | Required | Required | - |
+| Code compiles with new types | Required | Required | - |
+| Tests pass | Required | Required | - |
+
+### Phase-Specific Gates
+
+#### Phase 1 (Additive)
+- [ ] New tables visible in database
+- [ ] PostgREST cache refreshed
+- [ ] Product code uses new tables
+- [ ] Worker code writes to new tables
+
+#### Phase 2 (Transition)
+- [ ] Views return correct data
+- [ ] RPCs accept new parameters
+- [ ] Product tests pass
+- [ ] Worker tests pass
+
+#### Phase 3 (Cleanup)
+- [ ] Evidence artifacts exist
+- [ ] 24-hour observation passed
+- [ ] Product removed deprecated refs
+- [ ] Worker removed deprecated refs
+- [ ] Deprecated columns actually dropped
+
+---
+
+## Handoff Notes (Schema Repo Ownership Rules)
+
+Per AGENTS.md Section "Cross-Repo Coordination":
+
+### Before Schema Changes
+1. **Notify consumers** - Post in relevant repo or use issue
+2. **Assess impact** - Breaking changes need coordination
+3. **Plan migration** - Include backward-compatible steps when possible
+
+### After Schema Changes
+1. **Merge to main** - Only via PR, never direct push
+2. **Tag release** - Use semantic versioning for significant changes
+3. **Notify consumers** - Alert product and worker to sync
+
+### Handoff Message Template
+
+```
+## Schema Change Merged
+
+**Phase:** [1/2/3]
+**Migration:** [filename.sql]
+**New Objects:** [tables/columns/views]
+**Deprecated:** [if any]
+**Action Required:**
+- Product: [specific action]
+- Worker: [specific action]
+**Deadline:** [1 business day]
+```
+
+---
+
+## Anti-Patterns (MUST AVOID)
+
+1. **Worker deploys before migration verified**
+   - WRONG: Worker assumes schema is ready
+   - RIGHT: Wait for product signal "migration complete"
+
+2. **Cleanup before consumer migration**
+   - WRONG: Drop columns while code still uses them
+   - RIGHT: Block Phase 3 until consumers confirm removal
+
+3. **Skip type sync**
+   - WRONG: Assume old types still work
+   - RIGHT: Always sync and verify compile
+
+4. **Skip downstream communication**
+   - WRONG: Assume others will figure it out
+   - RIGHT: Explicit handoff with template above
+
+---
+
+## Emergency Contacts
+
+| Role | Repo | Contact Method |
+|------|------|----------------|
+| Schema Owner | camperplaner-schema | Issue mention |
+| Product Lead | camperplaner-product | Issue mention |
+| Worker Lead | camperplaner-worker | Issue mention |
+
+---
+
+## References
+
+- AGENTS.md - Schema ownership and sync contract
+- README.md - Repository sync workflow
+- task-12-type-sync.txt - Type regeneration strategy
+- docs/worker-schema-migration-guide.md - Consumer coordination context
+
+---
+
+Last Updated: 2026-03-18

@@ -1,0 +1,251 @@
+================================================================================
+TASK 3 EVIDENCE: One-Current-Row Constraint Design
+================================================================================
+Generated: 2026-03-18
+Task: Design one-current-row constraints, indexes, and null semantics
+
+================================================================================
+1. CURRENT-ROW CONSTRAINT SPECIFICATIONS
+================================================================================
+
+The following partial unique indexes enforce "one current row per X" semantics
+using PostgreSQL partial unique indexes. This pattern ensures:
+- Multiple historical rows can coexist (is_current = false)
+- Only one row per scope can have is_current = true
+- The constraint is automatically enforced by PostgreSQL
+
+--------------------------------------------------------------------------------
+1.1 place_osm_properties
+--------------------------------------------------------------------------------
+
+Constraint Name: uidx_osm_properties_place_current
+
+SQL:
+  CREATE UNIQUE INDEX uidx_osm_properties_place_current 
+      ON place_osm_properties(place_id) 
+      WHERE is_current = true;
+
+Purpose: Ensures only one current OSM property row per place
+Scope: One row per place_id when is_current = true
+
+--------------------------------------------------------------------------------
+1.2 place_google_properties
+--------------------------------------------------------------------------------
+
+Constraint Name: uidx_google_properties_place_current
+
+SQL:
+  CREATE UNIQUE INDEX uidx_google_properties_place_current 
+      ON place_google_properties(place_id) 
+      WHERE is_current = true;
+
+Purpose: Ensures only one current Google property row per place
+Scope: One row per place_id when is_current = true
+
+--------------------------------------------------------------------------------
+1.3 place_llm_properties
+--------------------------------------------------------------------------------
+
+Constraint Name: uidx_llm_properties_place_current
+
+SQL:
+  CREATE UNIQUE INDEX uidx_llm_properties_place_current 
+      ON place_llm_properties(place_id) 
+      WHERE is_current = true;
+
+Purpose: Ensures only one current LLM property row per place
+Scope: One row per place_id when is_current = true
+
+--------------------------------------------------------------------------------
+1.4 place_user_properties
+--------------------------------------------------------------------------------
+
+Constraint Name: uidx_user_properties_place_user_current
+
+SQL:
+  CREATE UNIQUE INDEX uidx_user_properties_place_user_current 
+      ON place_user_properties(place_id, user_id) 
+      WHERE is_current = true;
+
+Purpose: Ensures only one current user property row per (place, user) pair
+Scope: One row per (place_id, user_id) when is_current = true
+
+Note: Different from source tables because user corrections are per-user,
+not global. Each user can have one "current" correction per place.
+
+================================================================================
+2. MANDATORY INDEXES
+================================================================================
+
+Each property table requires the following indexes for common query patterns:
+
+--------------------------------------------------------------------------------
+2.1 place_osm_properties Indexes
+--------------------------------------------------------------------------------
+
+-- Primary lookup by place
+CREATE INDEX idx_osm_properties_place_id 
+    ON place_osm_properties(place_id);
+
+-- Current row lookups (hot path)
+CREATE INDEX idx_osm_properties_is_current 
+    ON place_osm_properties(is_current) 
+    WHERE is_current = true;
+
+-- OSM-specific identifier lookups
+CREATE INDEX idx_osm_properties_osm_id 
+    ON place_osm_properties(osm_id);
+
+-- Composite for current row by place
+CREATE INDEX idx_osm_properties_place_current 
+    ON place_osm_properties(place_id, is_current) 
+    WHERE is_current = true;
+
+--------------------------------------------------------------------------------
+2.2 place_google_properties Indexes
+--------------------------------------------------------------------------------
+
+-- Primary lookup by place
+CREATE INDEX idx_google_properties_place_id 
+    ON place_google_properties(place_id);
+
+-- Current row lookups (hot path)
+CREATE INDEX idx_google_properties_is_current 
+    ON place_google_properties(is_current) 
+    WHERE is_current = true;
+
+-- Google-specific identifier lookups
+CREATE INDEX idx_google_properties_google_place_id 
+    ON place_google_properties(google_place_id);
+
+-- Cache expiry lookups
+CREATE INDEX idx_google_properties_expires 
+    ON place_google_properties(expires_at) 
+    WHERE expires_at IS NOT NULL;
+
+-- Composite for current row by place
+CREATE INDEX idx_google_properties_place_current 
+    ON place_google_properties(place_id, is_current) 
+    WHERE is_current = true;
+
+--------------------------------------------------------------------------------
+2.3 place_llm_properties Indexes
+--------------------------------------------------------------------------------
+
+-- Primary lookup by place
+CREATE INDEX idx_llm_properties_place_id 
+    ON place_llm_properties(place_id);
+
+-- Current row lookups (hot path)
+CREATE INDEX idx_llm_properties_is_current 
+    ON place_llm_properties(is_current) 
+    WHERE is_current = true;
+
+-- Provider/model lookups
+CREATE INDEX idx_llm_properties_provider 
+    ON place_llm_properties(provider);
+
+-- Composite for current row by place
+CREATE INDEX idx_llm_properties_place_current 
+    ON place_llm_properties(place_id, is_current) 
+    WHERE is_current = true;
+
+--------------------------------------------------------------------------------
+2.4 place_user_properties Indexes
+--------------------------------------------------------------------------------
+
+-- Primary lookup by place
+CREATE INDEX idx_user_properties_place_id 
+    ON place_user_properties(place_id);
+
+-- User lookup
+CREATE INDEX idx_user_properties_user_id 
+    ON place_user_properties(user_id);
+
+-- Current row lookups per user
+CREATE INDEX idx_user_properties_user_current 
+    ON place_user_properties(user_id, is_current) 
+    WHERE is_current = true;
+
+-- Composite for current row by place+user
+CREATE INDEX idx_user_properties_place_user_current 
+    ON place_user_properties(place_id, user_id, is_current) 
+    WHERE is_current = true;
+
+================================================================================
+3. CONSTRAINT DESIGN PATTERN
+================================================================================
+
+The partial unique index pattern is chosen over:
+- Trigger-based solutions (more complex, potential race conditions)
+- Application-level enforcement (not enforceable at DB level)
+- Full unique constraints (would prevent historical rows)
+
+Why Partial Unique Indexes:
+1. PostgreSQL natively enforces this pattern
+2. Automatically handles concurrent inserts
+3. No application logic required
+4. Clear semantics: WHERE clause defines the partial uniqueness
+
+Pattern Source:
+- osm_source: uidx_osm_source_place_current
+- place_google_sources: uidx_google_sources_place_current  
+- place_llm_enrichments: uidx_llm_enrichments_place_current_completed
+
+================================================================================
+4. VERIFICATION QUERIES
+================================================================================
+
+-- Verify all partial unique indexes exist
+SELECT indexname, indexdef 
+FROM pg_indexes 
+WHERE schemaname = 'public' 
+AND indexname IN (
+    'uidx_osm_properties_place_current',
+    'uidx_google_properties_place_current',
+    'uidx_llm_properties_place_current',
+    'uidx_user_properties_place_user_current'
+);
+
+-- Test constraint enforcement (should fail with duplicate current)
+-- This should FAIL:
+-- INSERT INTO place_osm_properties (place_id, is_current) VALUES (1, true);
+-- INSERT INTO place_osm_properties (place_id, is_current) VALUES (1, true);
+
+-- Test partial unique behavior (should succeed - different place_id)
+-- This should SUCCEED:
+-- INSERT INTO place_osm_properties (place_id, is_current) VALUES (1, true);
+-- INSERT INTO place_osm_properties (place_id, is_current) VALUES (2, true);
+
+-- Test user properties (should fail with duplicate place+user current)
+-- This should FAIL:
+-- INSERT INTO place_user_properties (place_id, user_id, is_current) 
+-- VALUES (1, 'user-uuid-1', true);
+-- INSERT INTO place_user_properties (place_id, user_id, is_current) 
+-- VALUES (1, 'user-uuid-1', true);
+
+-- Test user properties (should succeed - different users)
+-- This should SUCCEED:
+-- INSERT INTO place_user_properties (place_id, user_id, is_current) 
+-- VALUES (1, 'user-uuid-1', true);
+-- INSERT INTO place_user_properties (place_id, user_id, is_current) 
+-- VALUES (1, 'user-uuid-2', true);
+
+================================================================================
+5. ROLLBACK CONSIDERATIONS
+================================================================================
+
+To rollback current-row constraints:
+- Simply DROP the partial unique indexes
+- No data migration required
+- Historical rows remain intact
+
+Example rollback:
+  DROP INDEX IF EXISTS uidx_osm_properties_place_current;
+  DROP INDEX IF EXISTS uidx_google_properties_place_current;
+  DROP INDEX IF EXISTS uidx_llm_properties_place_current;
+  DROP INDEX IF EXISTS uidx_user_properties_place_user_current;
+
+================================================================================
+END OF EVIDENCE
+================================================================================

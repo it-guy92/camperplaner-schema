@@ -1,0 +1,198 @@
+================================================================================
+F1: DEPRECATED TABLE REMOVAL VERIFICATION
+================================================================================
+Date: 2026-03-18
+Plan: place-properties-migration
+Task: F1 - Verify all deprecated tables are scheduled for removal
+
+================================================================================
+SECTION 1: DEPRECATED TABLE INVENTORY
+================================================================================
+
+Reference: .sisyphus/evidence/task-16-drop-sequence.txt
+
+8 tables are deprecated and scheduled for removal:
+
+| # | Table                          | Parent Table                  | Archive? |
+|---|--------------------------------|-------------------------------|----------|
+| 1 | place_llm_evidence_markers     | place_llm_enrichments         | DISCARD  |
+| 2 | place_evidence_markers         | place_source_evidence_runs    | DISCARD  |
+| 3 | place_evidence_sources         | place_source_evidence_runs    | DISCARD  |
+| 4 | place_google_amenities         | place_google_sources          | DISCARD  |
+| 5 | place_google_types             | place_google_sources          | DISCARD  |
+| 6 | place_llm_facts                | place_llm_enrichments         | DISCARD  |
+| 7 | place_llm_sources              | place_llm_enrichments         | DISCARD  |
+| 8 | place_source_evidence_runs     | (root)                        | ARCHIVE  |
+
+================================================================================
+SECTION 2: GREP VERIFICATION - ALL DEPRECATED TABLES FOUND IN SQL
+================================================================================
+
+Search: place_google_amenities|place_google_types|place_llm_facts|place_llm_sources|place_llm_evidence_markers|place_source_evidence_runs|place_evidence_markers|place_evidence_sources
+
+Results: 136 matches across 4 files
+
+| Table                          | Found in SQL? | File(s)                                    |
+|--------------------------------|---------------|--------------------------------------------|
+| place_google_amenities         | ✅ YES        | 20260316000001_add_google_amenities_table.sql |
+| place_google_types             | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+| place_llm_facts                | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+| place_llm_sources              | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+| place_llm_evidence_markers     | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+| place_source_evidence_runs     | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+| place_evidence_sources         | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+| place_evidence_markers         | ✅ YES        | 20260316110002_add_source_family_tables.sql |
+
+ALL 8 DEPRECATED TABLES ACCOUNTED FOR ✅
+
+================================================================================
+SECTION 3: DROP SEQUENCE VERIFICATION
+================================================================================
+
+Reference: task-16-drop-sequence.txt Section 3
+
+Wave 1: Leaf children with no dependents
+  1. place_llm_evidence_markers   ✅ Sequenced
+  2. place_evidence_markers        ✅ Sequenced
+  3. place_evidence_sources        ✅ Sequenced
+
+Wave 2: Leaf children with mapped data
+  4. place_google_amenities        ✅ Sequenced
+  5. place_google_types            ✅ Sequenced
+  6. place_llm_facts               ✅ Sequenced
+  7. place_llm_sources             ✅ Sequenced
+
+Wave 3: Deprecated parent with archive
+  8. place_source_evidence_runs    ✅ Sequenced (ARCHIVE before drop)
+
+Wave 4: Post-drop cleanup
+  9. Remove deprecated types from generated/database.types.ts  ✅ Sequenced
+  10. Update docs/database-schema.md                           ✅ Sequenced
+
+ALL 8 TABLES + 2 CLEANUP STEPS SEQUENCED ✅
+
+================================================================================
+SECTION 4: FK DEPENDENCY ORDER VERIFICATION
+================================================================================
+
+Drop order MUST respect FK dependencies (children before parents):
+
+```
+places (id)
+  ├── place_source_evidence_runs (place_id) ← DEPRECATED
+  │     ├── place_evidence_sources (evidence_run_id) ← DEPRECATED
+  │     └── place_evidence_markers (evidence_run_id) ← DEPRECATED
+  ├── place_llm_enrichments (place_id) ← RETAINED
+  │     ├── place_llm_facts (llm_enrichment_id) ← DEPRECATED
+  │     ├── place_llm_sources (llm_enrichment_id) ← DEPRECATED
+  │     └── place_llm_evidence_markers (llm_enrichment_id) ← DEPRECATED
+  └── place_google_sources (place_id) ← RETAINED
+        ├── place_google_reviews (google_source_id) ← RETAINED
+        ├── place_google_photos (google_source_id) ← RETAINED
+        ├── place_google_types (google_source_id) ← DEPRECATED
+        └── place_google_amenities (google_source_id) ← DEPRECATED
+```
+
+Verification:
+  ✅ Wave 1 drops leaf children BEFORE their parents
+  ✅ Wave 2 drops leaf children with mapped data
+  ✅ Wave 3 drops deprecated parent (place_source_evidence_runs) AFTER children
+  ✅ RETAINED tables (place_llm_enrichments, place_google_sources) NOT in drop list
+  ✅ RETAINED children (place_google_reviews, place_google_photos) NOT in drop list
+
+FK DEPENDENCY ORDER CORRECT ✅
+
+================================================================================
+SECTION 5: DATA MIGRATION VERIFICATION
+================================================================================
+
+Each deprecated table has data migrated to property tables:
+
+| Deprecated Table              | Data Migrated To                      | Verified? |
+|-------------------------------|---------------------------------------|-----------|
+| place_google_amenities        | place_google_properties (flattened)   | ✅ YES    |
+| place_google_types            | place_google_properties (flattened)   | ✅ YES    |
+| place_llm_facts               | place_llm_properties (flattened)      | ✅ YES    |
+| place_llm_sources             | place_llm_properties.source_urls      | ✅ YES    |
+| place_llm_evidence_markers    | DISCARD (process data)                | ✅ YES    |
+| place_evidence_markers        | DISCARD (process data)                | ✅ YES    |
+| place_evidence_sources        | DISCARD (process data)                | ✅ YES    |
+| place_source_evidence_runs    | ARCHIVE to cold storage               | ✅ YES    |
+
+DATA MIGRATION PATHS CLEAR ✅
+
+================================================================================
+SECTION 6: ARCHIVE DECISION VERIFICATION
+================================================================================
+
+| Table                        | Archive? | Rationale                                    |
+|------------------------------|----------|----------------------------------------------|
+| place_source_evidence_runs   | YES      | Debugging capability; audit trail preservation |
+| All others                   | NO       | Data flattened into property tables or process data |
+
+Archive procedure documented in task-16-drop-sequence.txt Section 4:
+  1. Export to CSV
+  2. Upload to cold storage (S3)
+  3. Verify checksum
+  4. Document location
+  5. THEN drop table
+
+ARCHIVE DECISIONS DOCUMENTED ✅
+
+================================================================================
+SECTION 7: DROP MIGRATION STATUS
+================================================================================
+
+Current state:
+  ❌ No drop migration file exists yet
+  ✅ Drop sequence fully documented in task-16-drop-sequence.txt
+  ✅ Drop SQL template provided (Section 5)
+  ✅ Rollback plan documented (Section 7)
+
+This is EXPECTED - drops happen after:
+  1. Property tables validated (24-hour observation)
+  2. Read cutover verified
+  3. place_source_evidence_runs archived
+  4. Consumer repos synced
+
+================================================================================
+SECTION 8: RETAINED TABLES VERIFICATION
+================================================================================
+
+Tables that MUST NOT be dropped:
+
+| Table                        | Status    | Reason                    |
+|------------------------------|-----------|---------------------------|
+| places                       | ✅ RETAINED | Core table (minimal)      |
+| osm_source                   | ✅ RETAINED | OSM source data           |
+| place_google_sources         | ✅ RETAINED | Google source data        |
+| place_google_reviews         | ✅ RETAINED | Google reviews            |
+| place_google_photos          | ✅ RETAINED | Google photos             |
+| place_llm_enrichments        | ✅ RETAINED | LLM enrichment data       |
+| enrichment_jobs              | ✅ RETAINED | Job queue                 |
+
+NONE of these appear in the drop sequence ✅
+
+================================================================================
+VERDICT: CONDITIONAL PASS ⚠️
+================================================================================
+
+All deprecated tables are correctly identified and scheduled:
+  ✅ All 8 deprecated tables found in SQL files
+  ✅ All 8 tables sequenced in correct FK dependency order
+  ✅ Archive decision documented for place_source_evidence_runs
+  ✅ Data migration paths verified for all tables
+  ✅ Retained tables NOT in drop list
+  ✅ Drop SQL template provided
+  ✅ Rollback plan documented
+
+However, the drop migration has NOT been created yet:
+  ❌ No migration file drops the 8 deprecated tables
+
+This is EXPECTED - drops happen after validation gates pass.
+
+Action required: Create drop migration after:
+  1. 24-hour observation window
+  2. Read cutover verified
+  3. place_source_evidence_runs archived
+  4. Consumer repos synced

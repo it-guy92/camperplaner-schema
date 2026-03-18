@@ -1,0 +1,126 @@
+# F3 Orphan Check Queries
+# Generated: 2026-03-18
+# Purpose: Document orphan detection queries for post-migration verification
+
+## Orphan Check Strategy
+
+Foreign key constraints should prevent orphaned rows, but these queries
+verify integrity explicitly. Orphaned rows indicate FK violations or
+incomplete cleanup.
+
+## Orphan Detection Queries
+
+### 1. Orphaned OSM Properties
+```sql
+SELECT pop.*
+FROM place_osm_properties pop
+LEFT JOIN places p ON p.id = pop.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** 0 rows
+
+### 2. Orphaned Google Properties
+```sql
+SELECT pgp.*
+FROM place_google_properties pgp
+LEFT JOIN places p ON p.id = pgp.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** 0 rows
+
+### 3. Orphaned LLM Properties
+```sql
+SELECT plp.*
+FROM place_llm_properties plp
+LEFT JOIN places p ON p.id = plp.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** 0 rows
+
+### 4. Orphaned User Properties
+```sql
+SELECT pup.*
+FROM place_user_properties pup
+LEFT JOIN places p ON p.id = pup.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** 0 rows
+
+### 5. Orphaned Google Reviews (retained 1:n table)
+```sql
+SELECT pgr.*
+FROM place_google_reviews pgr
+LEFT JOIN places p ON p.id = pgr.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** 0 rows
+
+### 6. Orphaned Google Photos (retained 1:n table)
+```sql
+SELECT pgp.*
+FROM place_google_photos pgp
+LEFT JOIN places p ON p.id = pgp.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** 0 rows
+
+### 7. Combined Orphan Summary
+```sql
+SELECT 'place_osm_properties' AS table_name, COUNT(*) AS orphan_count
+FROM place_osm_properties pop
+LEFT JOIN places p ON p.id = pop.place_id
+WHERE p.id IS NULL
+UNION ALL
+SELECT 'place_google_properties', COUNT(*)
+FROM place_google_properties pgp
+LEFT JOIN places p ON p.id = pgp.place_id
+WHERE p.id IS NULL
+UNION ALL
+SELECT 'place_llm_properties', COUNT(*)
+FROM place_llm_properties plp
+LEFT JOIN places p ON p.id = plp.place_id
+WHERE p.id IS NULL
+UNION ALL
+SELECT 'place_user_properties', COUNT(*)
+FROM place_user_properties pup
+LEFT JOIN places p ON p.id = pup.place_id
+WHERE p.id IS NULL
+UNION ALL
+SELECT 'place_google_reviews', COUNT(*)
+FROM place_google_reviews pgr
+LEFT JOIN places p ON p.id = pgr.place_id
+WHERE p.id IS NULL
+UNION ALL
+SELECT 'place_google_photos', COUNT(*)
+FROM place_google_photos pgp
+LEFT JOIN places p ON p.id = pgp.place_id
+WHERE p.id IS NULL;
+```
+**Expected result:** All rows show orphan_count = 0
+
+## FK Constraint Verification
+
+These queries should be unnecessary if FK constraints are properly enforced,
+but serve as explicit validation:
+
+```sql
+-- Verify FK constraints exist
+SELECT
+  tc.table_name,
+  kcu.column_name,
+  ccu.table_name AS foreign_table_name,
+  ccu.column_name AS foreign_column_name
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage AS ccu
+  ON ccu.constraint_name = tc.constraint_name
+WHERE tc.constraint_type = 'FOREIGN KEY'
+  AND tc.table_name LIKE 'place_%properties';
+```
+
+## Execution Note
+
+These queries require a running Supabase instance with migrations applied.
+Execute via: `supabase db reset` then run queries against local database.
+Zero orphaned rows across all property tables confirms FK integrity.

@@ -1,0 +1,196 @@
+# Task 12: Type Regeneration and Downstream Sync Strategy
+
+## Overview
+This file documents the explicit sequencing for type regeneration and downstream consumer synchronization across all three migration phases.
+
+---
+
+## Type Generation Command
+
+```bash
+# Using Supabase CLI
+supabase gen types typescript --local > generated/database.types.ts
+```
+
+**Location**: Must run from schema repository root (`camperplaner-schema/`)
+
+---
+
+## Phase 1: Additive (New Tables) - Type Sync
+
+### When to Regenerate Types:
+**AFTER** Phase 1 migration executes successfully
+
+### Sequence:
+1. Execute Phase 1 migration (creates 4 property tables)
+2. Run: `supabase gen types typescript --local > generated/database.types.ts`
+3. Verify generated types include:
+   - `place_osm_properties` (60 columns)
+   - `place_google_properties` (61 columns)
+   - `place_llm_properties` (61 columns)
+   - `place_user_properties` (56 columns)
+4. Commit generated types to schema repo
+
+### Downstream Sync (After Phase 1):
+
+**Product Repo:**
+```bash
+cd ../camperplaner-product
+cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
+git add apps/web/src/lib/database.types.ts
+git commit -m "chore: sync schema types - Phase 1 property tables"
+```
+
+**Worker Repo:**
+```bash
+cd ../camperplaner-worker
+cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
+git add src/types/database.types.ts
+git commit -m "chore: sync schema types - Phase 1 property tables"
+```
+
+### Timing:
+- Types regenerate: Immediately after migration
+- Downstream sync: Within 1 business day (per AGENTS.md contract)
+
+---
+
+## Phase 2: Transition (Views/RPC) - Type Sync
+
+### When to Regenerate Types:
+**AFTER** Phase 2 migration executes successfully (views/RPC updated)
+
+### Sequence:
+1. Execute Phase 2 migration (rewrites views, updates functions)
+2. Run: `supabase gen types typescript --local > generated/database.types.ts`
+3. Verify generated types include any new view/function signatures
+4. Commit generated types to schema repo
+
+### Downstream Sync (After Phase 2):
+
+**Product Repo:**
+```bash
+cd ../camperplaner-product
+cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
+git add apps/web/src/lib/database.types.ts
+git commit -m "chore: sync schema types - Phase 2 view updates"
+```
+
+**Worker Repo:**
+```bash
+cd ../camperplaner-worker
+cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
+git add src/types/database.types.ts
+git commit -m "chore: sync schema types - Phase 2 view updates"
+```
+
+### Validation Gate:
+- Consumer code must compile with new types
+- Run product tests: `npm test` or relevant test command
+- Run worker tests: `npm test` or relevant test command
+
+---
+
+## Phase 3: Cleanup (Drop Deprecated) - Type Sync
+
+### When to Regenerate Types:
+**AFTER** Phase 3 migration executes successfully (columns dropped)
+
+### Evidence Gate Required BEFORE Phase 3:
+1. Pre-cleanup row counts documented
+2. FK dependency audit completed
+3. Consumer compatibility verified (24-hour observation)
+
+### Sequence:
+1. Verify evidence artifacts exist (per Task 6 rules)
+2. Execute Phase 3 migration (drops deprecated columns)
+3. Run: `supabase gen types typescript --local > generated/database.types.ts`
+4. Verify generated types reflect column removals:
+   - Removed: places table deprecated columns
+   - Removed: legacy view definitions
+5. Commit generated types to schema repo
+
+### Downstream Sync (After Phase 3):
+
+**Product Repo:**
+```bash
+cd ../camperplaner-product
+cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
+git add apps/web/src/lib/database.types.ts
+git commit -m "chore: sync schema types - Phase 3 cleanup"
+```
+
+**Worker Repo:**
+```bash
+cd ../camperplaner-worker
+cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
+git add src/types/database.types.ts
+git commit -m "chore: sync schema types - Phase 3 cleanup"
+```
+
+---
+
+## Sync Timing Summary
+
+| Phase | Migration Type | Type Regen Timing | Downstream Sync | Consumer Validation |
+|-------|---------------|-------------------|-----------------|---------------------|
+| Phase 1 | Additive | After migration | Within 1 day | Compile check |
+| Phase 2 | Transition | After migration | Within 1 day | Test suite pass |
+| Phase 3 | Destructive | After migration | Within 1 day | 24-hour observe |
+
+---
+
+## Anti-Patterns (MUST AVOID)
+
+1. **Regenerate BEFORE migration**
+   - WRONG: Run `supabase gen` before executing migration
+   - RIGHT: Run `supabase gen` AFTER migration completes
+
+2. **Skip downstream sync**
+   - WRONG: Assume consumers will pull automatically
+   - RIGHT: Explicitly copy and commit in consumer repos
+
+3. **Sync stale types**
+   - WRONG: Copy old types while migration pending
+   - RIGHT: Verify types include new columns before sync
+
+4. **Skip consumer validation**
+   - WRONG: Assume tests pass without running
+   - RIGHT: Run test suite after type sync
+
+---
+
+## Rollback Triggers
+
+| Trigger | Condition | Action |
+|---------|-----------|--------|
+| Type Gen Failure | `supabase gen` exits non-zero | Revert migration, investigate |
+| Consumer Compile Error | Type errors in product/worker | Revert types, investigate |
+| Consumer Test Failure | Tests fail after sync | Block until fixed |
+
+---
+
+## Contract Adherence
+
+Per AGENTS.md Section "Post-Merge Consumer Sync Contract":
+
+> **Product Repo sync command:**
+> ```bash
+> cp -r ../camperplaner-schema/generated/* apps/web/src/lib/
+> ```
+> 
+> **Worker Repo sync command:**
+> ```bash
+> cp ../camperplaner-schema/generated/database.types.ts src/types/database.types.ts
+> ```
+> 
+> **Timing expectation:** Consumers should sync within 1 business day of schema merge.
+
+This strategy document ensures:
+1. Types regenerated AFTER each phase migration
+2. Consumers sync within 1 business day
+3. Validation gates enforced before Phase 3
+
+---
+
+Last Updated: 2026-03-18

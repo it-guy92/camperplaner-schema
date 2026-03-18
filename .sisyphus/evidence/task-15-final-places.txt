@@ -1,0 +1,200 @@
+================================================================================
+TASK 15: PLACES TABLE CLEANUP - FINAL SCHEMA DEFINITION
+================================================================================
+Date: 2026-03-18
+Purpose: Define the minimal final shape of the `places` table after cleanup
+Scope: Column removal plan, sequencing, and safeguards
+
+================================================================================
+1. CURRENT STATE (30 columns)
+================================================================================
+
+| # | Column            | Type        | Constraints      | Status    |
+|---|-------------------|-------------|------------------|-----------|
+| 1 | id                | bigint      | PK, NOT NULL     | KEEP      |
+| 2 | place_type        | text        | NOT NULL         | REMOVE    |
+| 3 | name              | text        | NOT NULL         | REMOVE    |
+| 4 | geom              | geometry    | NOT NULL         | REMOVE    |
+| 5 | lat               | numeric     | NULL             | KEEP      |
+| 6 | lon               | numeric     | NULL             | KEEP      |
+| 7 | country_code      | text        | NULL             | REMOVE    |
+| 8 | region            | text        | NULL             | REMOVE    |
+| 9 | city              | text        | NULL             | REMOVE    |
+|10 | postcode          | text        | NULL             | REMOVE    |
+|11 | address           | text        | NULL             | REMOVE    |
+|12 | has_toilet        | boolean     | NOT NULL         | REMOVE    |
+|13 | has_shower        | boolean     | NOT NULL         | REMOVE    |
+|14 | has_electricity   | boolean     | NOT NULL         | REMOVE    |
+|15 | has_water         | boolean     | NOT NULL         | REMOVE    |
+|16 | has_wifi          | boolean     | NOT NULL         | REMOVE    |
+|17 | pet_friendly      | boolean     | NOT NULL         | REMOVE    |
+|18 | caravan_allowed   | boolean     | NOT NULL         | REMOVE    |
+|19 | motorhome_allowed | boolean     | NOT NULL         | REMOVE    |
+|20 | tent_allowed      | boolean     | NOT NULL         | REMOVE    |
+|21 | website           | text        | NULL             | REMOVE    |
+|22 | phone             | text        | NULL             | REMOVE    |
+|23 | email             | text        | NULL             | REMOVE    |
+|24 | opening_hours     | text        | NULL             | REMOVE    |
+|25 | fee_info          | text        | NULL             | REMOVE    |
+|26 | source_primary    | text        | NOT NULL         | REMOVE    |
+|27 | data_confidence   | numeric     | NULL             | REMOVE    |
+|28 | last_seen_at      | timestamptz | NULL             | REMOVE    |
+|29 | last_enriched_at  | timestamptz | NULL             | REMOVE    |
+|30 | is_active         | boolean     | NOT NULL         | KEEP      |
+|31 | created_at        | timestamptz | NOT NULL         | KEEP      |
+|32 | updated_at        | timestamptz | NOT NULL         | KEEP      |
+
+================================================================================
+2. TARGET STATE (6 columns)
+================================================================================
+
+| # | Column     | Type        | Constraints      | Purpose                    |
+|---|------------|-------------|------------------|----------------------------|
+| 1 | id         | bigint      | PK, NOT NULL     | Place identifier           |
+| 2 | lat        | numeric     | NULL             | Latitude coordinate        |
+| 3 | lon        | numeric     | NULL             | Longitude coordinate       |
+| 4 | is_active  | boolean     | NOT NULL         | Soft-delete flag           |
+| 5 | created_at | timestamptz | NOT NULL         | Record creation timestamp  |
+| 6 | updated_at | timestamptz | NOT NULL         | Last modification timestamp|
+
+================================================================================
+3. COLUMNS TO REMOVE (26 columns)
+================================================================================
+
+3.1 BUSINESS DATA COLUMNS (19 columns)
+    These contain place-specific business data that migrates to source tables:
+    - name → place_google_sources.name, osm_source.raw_name
+    - place_type → place_google_types, osm_source.osm_type
+    - country_code → Derived from lat/lon or source tables
+    - region → Derived from lat/lon or source tables
+    - city → Derived from lat/lon or source tables
+    - postcode → Derived from lat/lon or source tables
+    - address → place_google_sources.formatted_address
+    - website → place_google_sources.website
+    - phone → place_google_sources.phone
+    - email → place_google_sources (if available)
+    - opening_hours → place_google_amenities or LLM facts
+    - fee_info → place_llm_facts or place_google_amenities
+    - has_toilet → place_google_amenities
+    - has_shower → place_google_amenities
+    - has_electricity → place_google_amenities
+    - has_water → place_google_amenities
+    - has_wifi → place_google_amenities
+    - pet_friendly → place_google_amenities
+    - caravan_allowed → place_google_amenities
+    - motorhome_allowed → place_google_amenities
+    - tent_allowed → place_google_amenities
+
+3.2 GEOMETRY COLUMN (1 column)
+    - geom → Replaced by lat/lon numeric columns
+    - Index idx_places_geom must also be dropped
+    - Audit confirms: No ST_* functions query places.geom
+    - Audit confirms: No views depend on places.geom
+    - Audit confirms: lat/lon provide complete fallback
+
+3.3 SOURCE TRACKING COLUMNS (4 columns)
+    - source_primary → Tracked in osm_source, place_google_sources
+    - data_confidence → Tracked in place_llm_enrichments.confidence
+    - last_seen_at → Tracked in osm_source.last_seen_at
+    - last_enriched_at → Tracked in place_llm_enrichments.completed_at
+
+================================================================================
+4. REMOVAL SEQUENCING
+================================================================================
+
+Phase 1: Business Data Columns (19 columns)
+  Batch A (address/location):
+    - country_code, region, city, postcode, address
+  Batch B (contact):
+    - website, phone, email, opening_hours, fee_info
+  Batch C (amenities):
+    - has_toilet, has_shower, has_electricity, has_water, has_wifi
+    - pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed
+  Batch D (identity):
+    - name, place_type
+
+Phase 2: Geometry Column (1 column + index)
+  - geom column
+  - idx_places_geom GIST index
+  - Requires: Task 5 geometry audit verified (DONE)
+
+Phase 3: Source Tracking Columns (4 columns)
+  - source_primary, data_confidence, last_seen_at, last_enriched_at
+
+================================================================================
+5. MIGRATION SQL TEMPLATE
+================================================================================
+
+-- Phase 1: Business Data Columns
+SET lock_timeout = '5s';
+
+ALTER TABLE places
+  DROP COLUMN IF EXISTS country_code,
+  DROP COLUMN IF EXISTS region,
+  DROP COLUMN IF EXISTS city,
+  DROP COLUMN IF EXISTS postcode,
+  DROP COLUMN IF EXISTS address,
+  DROP COLUMN IF EXISTS website,
+  DROP COLUMN IF EXISTS phone,
+  DROP COLUMN IF EXISTS email,
+  DROP COLUMN IF EXISTS opening_hours,
+  DROP COLUMN IF EXISTS fee_info,
+  DROP COLUMN IF EXISTS has_toilet,
+  DROP COLUMN IF EXISTS has_shower,
+  DROP COLUMN IF EXISTS has_electricity,
+  DROP COLUMN IF EXISTS has_water,
+  DROP COLUMN IF EXISTS has_wifi,
+  DROP COLUMN IF EXISTS pet_friendly,
+  DROP COLUMN IF EXISTS caravan_allowed,
+  DROP COLUMN IF EXISTS motorhome_allowed,
+  DROP COLUMN IF EXISTS tent_allowed,
+  DROP COLUMN IF EXISTS name,
+  DROP COLUMN IF EXISTS place_type;
+
+-- Phase 2: Geometry
+DROP INDEX IF EXISTS idx_places_geom;
+ALTER TABLE places DROP COLUMN IF EXISTS geom;
+
+-- Phase 3: Source Tracking
+ALTER TABLE places
+  DROP COLUMN IF EXISTS source_primary,
+  DROP COLUMN IF EXISTS data_confidence,
+  DROP COLUMN IF EXISTS last_seen_at,
+  DROP COLUMN IF EXISTS last_enriched_at;
+
+================================================================================
+6. ROLLBACK PLAN
+================================================================================
+
+Rollback requires restoring columns from backup or re-adding with defaults:
+
+-- Emergency rollback (re-add columns with NULL/defaults)
+ALTER TABLE places
+  ADD COLUMN name text DEFAULT 'Unknown',
+  ADD COLUMN place_type text DEFAULT 'camp_site',
+  ADD COLUMN geom geometry(Point, 4326) GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(lon, lat), 4326)) STORED,
+  -- ... (full rollback in migration file)
+
+NOTE: geom can be regenerated from lat/lon if lat/lon are populated.
+      Business data columns require backup restore.
+
+================================================================================
+7. VERIFICATION CHECKLIST
+================================================================================
+
+[ ] Only 6 columns remain: id, lat, lon, is_active, created_at, updated_at
+[ ] idx_places_geom index dropped
+[ ] No application errors after column removal
+[ ] campsite_full view still functional
+[ ] get_place_source_bundle RPC still functional
+[ ] Consumer repos synced with updated types
+[ ] 24-hour observation window complete
+
+================================================================================
+EVIDENCE ARTIFACTS
+================================================================================
+
+- task-5-geometry-audit.txt: Geometry dependency audit (NO BLOCKERS)
+- task-6-checkpoints.txt: Expand-contract checkpoint gates
+- task-15-final-places.txt: This file
+- task-15-cleanup-gates.txt: Validation gate definitions

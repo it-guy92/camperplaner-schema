@@ -1,0 +1,86 @@
+# Task 6: Expand-Contract Checkpoints and Rollback Policy
+
+## Summary
+Designed rollback checkpoints, lock safety requirements, and migration evidence policy for expand-contract (additive→transition→destructive) migration pattern.
+
+## Files Created
+
+### 1. .sisyphus/evidence/task-6-checkpoints.txt
+Defines the three-phase expand-contract model with explicit checkpoint gates.
+
+### 2. .sisyphus/evidence/task-6-rollback-rules.txt
+Defines rollback triggers, lock safety (lock_timeout='5s'), and evidence requirements before destructive cleanup.
+
+## Expand-Contract Phases
+
+### Phase 1: Additive Expansion (Safe)
+- Create NEW tables, columns, indexes
+- NO modifications to existing schema
+- NO drops of any kind
+- Safe to rollback: simply revert migrations
+- Checkpoint: Verify new objects exist and are accessible
+
+### Phase 2: Consumer Transition (Validation Gate)
+- Update views to reference new schema
+- Update RPCs to use new columns
+- Sync TypeScript types in consumer repos
+- Migrate consumers to write to new schema
+- Checkpoint: Verify all consumers can read/write new schema
+- **BLOCKS Phase 3 until consumer transition is complete**
+
+### Phase 3: Destructive Cleanup (Requires Evidence)
+- Drop deprecated tables
+- Drop deprecated columns
+- Remove unused indexes
+- **REQUIRES EVIDENCE before execution** (see task-6-rollback-rules.txt)
+
+## Rollback Checkpoints
+
+| Phase | Checkpoint | Evidence Required |
+|-------|-----------|-------------------|
+| P1-Additive | Schema deployed | Migration applied successfully |
+| P1-Additive | Objects accessible | Query new table/column succeeds |
+| P2-Transition | Views functional | SELECT on view returns data |
+| P2-Transition | Types synced | Consumer repos have updated types |
+| P2-Transition | Consumers migrated | Workers process jobs without errors |
+| P3-Cleanup | Pre-cleanup audit | Row counts, FK references documented |
+| P3-Cleanup | Post-cleanup verify | Application functions normally |
+
+## Lock Safety Requirements
+
+All DDL operations MUST use:
+```sql
+SET lock_timeout = '5s';
+```
+
+This prevents:
+- Long-running table locks blocking writes
+- Deadlocks with active workers
+- Unresponsive application during migrations
+
+## Validation Gates
+
+### Gate P2→P3 (Transition→Cleanup)
+Before executing destructive cleanup:
+1. All consumers must be on new schema version
+2. 24-hour observation window complete
+3. Pre-cleanup row count evidence exists
+4. FK dependency audit complete
+5. Rollback plan documented
+
+### NO CLEANUP WITHOUT EVIDENCE
+If evidence artifacts are missing:
+- BLOCK destructive migration
+- Require evidence generation first
+- Never rely on manual memory
+
+## Evidence Artifacts Required
+
+See task-6-rollback-rules.txt for complete artifact清单.
+
+---
+
+**Verification:**
+- [x] task-6-checkpoints.txt created at .sisyphus/evidence/task-6-checkpoints.txt
+- [x] task-6-rollback-rules.txt created at .sisyphus/evidence/task-6-rollback-rules.txt
+- [x] Notepad entries created at .sisyphus/notepads/place-properties-migration/

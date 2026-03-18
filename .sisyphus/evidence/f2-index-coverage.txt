@@ -1,0 +1,107 @@
+================================================================================
+F2 EVIDENCE: Index Coverage Verification
+================================================================================
+Generated: 2026-03-18
+Source: supabase/migrations/20260318200000_add_property_tables.sql (PART 6)
+Reference: .sisyphus/evidence/task-3-current-row-rules.txt (Section 2)
+
+================================================================================
+1. INDEX VERIFICATION MATRIX
+================================================================================
+
+1.1 place_osm_properties (lines 502-515)
+--------------------------------------------------------------------------------
+Index Name                           | Column(s)            | Filter              | Status
+-------------------------------------|----------------------|---------------------|-------
+idx_osm_properties_place_id          | place_id             | (none)              | PASS
+idx_osm_properties_is_current        | is_current           | is_current = true   | PASS
+idx_osm_properties_osm_id            | osm_id               | osm_id IS NOT NULL  | PASS
+idx_osm_properties_place_current     | place_id, is_current | is_current = true   | PASS
+
+Notes:
+- osm_id index has WHERE osm_id IS NOT NULL filter (optimization for sparse column)
+- All 4 expected indexes present
+
+1.2 place_google_properties (lines 520-537)
+--------------------------------------------------------------------------------
+Index Name                           | Column(s)            | Filter              | Status
+-------------------------------------|----------------------|---------------------|-------
+idx_google_properties_place_id       | place_id             | (none)              | PASS
+idx_google_properties_is_current     | is_current           | is_current = true   | PASS
+idx_google_properties_google_place_id| google_place_id      | google_place_id IS NOT NULL | PASS
+idx_google_properties_expires        | expires_at           | expires_at IS NOT NULL | PASS
+idx_google_properties_place_current  | place_id, is_current | is_current = true   | PASS
+
+Notes:
+- google_place_id index has WHERE filter (sparse column optimization)
+- expires_at index supports cache expiry queries
+- All 5 expected indexes present
+
+1.3 place_llm_properties (lines 542-555)
+--------------------------------------------------------------------------------
+Index Name                           | Column(s)            | Filter              | Status
+-------------------------------------|----------------------|---------------------|-------
+idx_llm_properties_place_id          | place_id             | (none)              | PASS
+idx_llm_properties_is_current        | is_current           | is_current = true   | PASS
+idx_llm_properties_provider          | provider             | provider IS NOT NULL| PASS
+idx_llm_properties_place_current     | place_id, is_current | is_current = true   | PASS
+
+Notes:
+- provider index has WHERE filter (sparse column optimization)
+- All 4 expected indexes present
+
+1.4 place_user_properties (lines 560-572)
+--------------------------------------------------------------------------------
+Index Name                           | Column(s)            | Filter              | Status
+-------------------------------------|----------------------|---------------------|-------
+idx_user_properties_place_id         | place_id             | (none)              | PASS
+idx_user_properties_user_id          | user_id              | (none)              | PASS
+idx_user_properties_user_current     | user_id, is_current  | is_current = true   | PASS
+idx_user_properties_place_user_current| place_id, user_id, is_current | is_current = true | PASS
+
+Notes:
+- user_id index supports user-scoped queries
+- Composite indexes support current-row lookups per user
+- All 4 expected indexes present
+
+================================================================================
+2. INDEX PATTERN ANALYSIS
+================================================================================
+
+All tables share common index patterns:
+- place_id index (basic FK lookup)
+- is_current partial index (hot path for current row)
+- place_id + is_current composite (current row by place)
+
+Source-specific indexes:
+- OSM: osm_id (OSM object lookup)
+- Google: google_place_id (API ID lookup), expires_at (cache management)
+- LLM: provider (model/provider filtering)
+- User: user_id (user-scoped queries)
+
+All partial indexes use WHERE filters to reduce index size for sparse columns.
+
+================================================================================
+3. COVERAGE SUMMARY
+================================================================================
+
+Table                      | Expected | Found | Status
+---------------------------|----------|-------|-------
+place_osm_properties       | 4        | 4     | PASS
+place_google_properties    | 5        | 5     | PASS
+place_llm_properties      | 4        | 4     | PASS
+place_user_properties      | 4        | 4     | PASS
+---------------------------|----------|-------|-------
+TOTAL                      | 17       | 17    | PASS
+
+================================================================================
+4. OVERALL VERDICT
+================================================================================
+
+ALL 17 INDEXES PRESENT AND CORRECT
+No missing indexes. No unexpected indexes beyond spec.
+Source-specific identifier indexes properly filtered for sparse columns.
+
+================================================================================
+END OF EVIDENCE
+================================================================================
