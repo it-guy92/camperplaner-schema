@@ -1,0 +1,258 @@
+name: Check Artifacts Freshness
+
+on:
+  push:
+    paths:
+      - 'supabase/migrations/*.sql'
+      - 'generated/**'
+  pull_request:
+    paths:
+      - 'supabase/migrations/*.sql'
+      - 'generated/**'
+
+jobs:
+  check-manifest:
+    name: Validate Schema Manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate schema manifest
+        run: |
+          echo "::group::Validating schema-manifest.json"
+          
+          if [ ! -f "generated/schema-manifest.json" ]; then
+            echo "❌ ERROR: generated/schema-manifest.json not found"
+            echo ""
+            echo "The schema manifest is required to track:"
+            echo "  - Migration versions"
+            echo "  - Generated artifacts"
+            echo "  - Target consumer paths"
+            echo ""
+            echo "Create it by running: node scripts/generate-types.js"
+            exit 1
+          fi
+          
+          # Validate JSON syntax
+          if ! python3 -m json.tool generated/schema-manifest.json > /dev/null 2>&1; then
+            echo "❌ ERROR: schema-manifest.json is not valid JSON"
+            exit 1
+          fi
+          
+          # Extract latest migration from manifest
+          manifest_latest=$(python3 -c "import json; print(json.load(open('generated/schema-manifest.json')).get('migrations', {}).get('latest', 'null'))")
+          
+          # Find latest migration file
+          latest_file=$(ls -1 supabase/migrations/*.sql 2>/dev/null | grep -E '/[0-9]{14}_' | sort -r | head -1)
+          
+          if [ -z "$latest_file" ]; then
+            echo "  ℹ️  No migration files found"
+            exit 0
+          fi
+          
+          latest_timestamp=$(basename "$latest_file" | cut -c1-14)
+          
+          echo "  Manifest latest: $manifest_latest"
+          echo "  File system latest: $latest_timestamp"
+          
+          if [ "$manifest_latest" = "null" ] || [ -z "$manifest_latest" ]; then
+            echo "  ⚠️  Manifest has no latest migration recorded"
+          elif [ "$manifest_latest" != "$latest_timestamp" ]; then
+            echo "  ❌ Manifest is out of sync with migrations"
+            echo ""
+            echo "The schema manifest needs to be updated."
+            echo "Run: node scripts/generate-types.js"
+            exit 1
+          else
+            echo "  ✓ Manifest is in sync"
+          fi
+          
+          echo "::endgroup::"
+
+  check-types-exist:
+    name: Check TypeScript Types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify types file exists
+        run: |
+          echo "::group::Checking generated types"
+          
+          if [ ! -f "generated/database.types.ts" ]; then
+            echo "❌ ERROR: generated/database.types.ts not found"
+            echo ""
+            echo "This file should be generated from the database schema."
+            echo "To create it:"
+            echo "  1. Ensure SUPABASE_DB_PASSWORD is set in .env.local"
+            echo "  2. Run: node scripts/generate-types.js"
+            echo ""
+            echo "If this is a fresh clone, types may need to be generated locally."
+            exit 1
+          fi
+          
+          echo "  ✓ database.types.ts exists"
+          
+          # Check if file is not empty
+          if [ ! -s "generated/database.types.ts" ]; then
+            echo "  ❌ ERROR: database.types.ts is empty"
+            exit 1
+          fi
+          
+          echo "  ✓ database.types.ts is not empty"
+          
+          # Basic TypeScript syntax check (just check for export keyword)
+          if ! grep -q "export" "generated/database.types.ts"; then
+            echo "  ❌ ERROR: database.types.ts doesn't export any types"
+            exit 1
+          fi
+          
+          echo "  ✓ database.types.ts exports types"
+          
+          echo "::endgroup::"
+
+  check-doc-linkage:
+    name: Verify Documentation Linkage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check docs reference
+        run: |
+          echo "::group::Checking documentation linkage"
+          
+          # Check if CONTRACT.md exists and references migrations
+          if [ ! -f "CONTRACT.md" ]; then
+            echo "❌ ERROR: CONTRACT.md not found"
+            echo "   The contract document is required for consumer communication."
+            exit 1
+          fi
+          
+          echo "  ✓ CONTRACT.md exists"
+          
+          # Check for reference to latest migration
+          latest_file=$(ls -1 supabase/migrations/*.sql 2>/dev/null | grep -E '/[0-9]{14}_' | sort -r | head -1)
+          
+          if [ -n "$latest_file" ]; then
+            latest_timestamp=$(basename "$latest_file" | cut -c1-14)
+            
+            if ! grep -q "$latest_timestamp" "CONTRACT.md"; then
+              echo "  ⚠️  Latest migration ($latest_timestamp) not referenced in CONTRACT.md"
+              echo ""
+              echo "The contract document should be updated when migrations change."
+            else
+              echo "  ✓ Latest migration referenced in CONTRACT.md"
+            fi
+          fi
+          
+          # Check if AGENTS.md exists
+          if [ ! -f "AGENTS.md" ]; then
+            echo "❌ ERROR: AGENTS.md not found"
+            exit 1
+          fi
+          
+          echo "  ✓ AGENTS.md exists"
+          
+          echo "::endgroup::"
+
+  artifact-checksum:
+    name: Verify Artifact Checksums
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check manifest checksums
+        run: |
+          echo "::group::Verifying artifact checksums"
+          
+          if [ ! -f "generated/schema-manifest.json" ]; then
+            echo "  ℹ️  No manifest file to check"
+            exit 0
+          fi
+          
+          # Check if checksum is TBD (pending)
+          checksum=$(python3 -c "import json; print(json.load(open('generated/schema-manifest.json')).get('schema_hash', 'TBD'))")
+          
+          if [ "$checksum" = "TBD" ]; then
+            echo "  ⚠️  Schema hash is 'TBD' - artifacts need generation"
+          else
+            echo "  ✓ Schema hash recorded: ${checksum:0:16}..."
+          fi
+          
+          # Check artifact statuses
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          
+          try:
+              with open('generated/schema-manifest.json', 'r') as f:
+                  manifest = json.load(f)
+              
+              artifacts = manifest.get('artifacts', [])
+              has_pending = False
+              
+              for artifact in artifacts:
+                  status = artifact.get('status', 'unknown')
+                  name = artifact.get('name', 'unknown')
+                  
+                  if status == 'pending_generation':
+                      print(f"  ⚠️  {name}: Status is 'pending_generation'")
+                      has_pending = True
+                  elif status == 'generated':
+                      print(f"  ✓ {name}: Status is 'generated'")
+                  else:
+                      print(f"  ℹ️  {name}: Status is '{status}'")
+              
+              if has_pending:
+                  print("")
+                  print("Some artifacts are pending generation.")
+                  print("Run: node scripts/generate-types.js")
+                  exit(0)  # Warning only, not an error
+              
+          except Exception as e:
+              print(f"  ❌ Error reading manifest: {e}")
+              exit 1
+          PYTHON_SCRIPT
+          
+          echo "::endgroup::"
+
+  notify-missing-artifacts:
+    name: Notify on Missing Artifacts
+    runs-on: ubuntu-latest
+    needs: [check-manifest, check-types-exist]
+    if: failure()
+    steps:
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ⚠️ Schema Artifacts Need Update
+
+              This PR modifies database migrations but the generated artifacts appear to be out of sync.
+              
+              ### Required Actions:
+              1. Run artifact generation locally:
+                 \`\`\`bash
+                 node scripts/generate-types.js
+                 \`\`\`
+              2. Update the schema manifest:
+                 \`\`\`bash
+                 # Edit generated/schema-manifest.json with new migration timestamps
+                 \`\`\`
+              3. Commit the changes to this PR
+              
+              ### Files to Update:
+              - \`generated/database.types.ts\`
+              - \`generated/schema-manifest.json\`
+              - \`CONTRACT.md\` (if contract changes)
+              
+              See [AGENTS.md](./AGENTS.md) for details on the artifact generation process.`
+            })

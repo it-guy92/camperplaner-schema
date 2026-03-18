@@ -1,0 +1,2291 @@
+/**
+ * CANONICAL DATABASE TYPES
+ * 
+ * This file is GENERATED from the schema repository.
+ * DO NOT EDIT MANUALLY.
+ * 
+ * Source: https://github.com/it-guy92/camperplaner-schema
+ * Generated: 2026-03-18
+ * Migration Head: 20260317210003_source_family_constraints.sql
+ * 
+ * To regenerate: node scripts/generate-types.js
+ */
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type FactorType = 'totp' | 'webauthn' | 'phone'
+
+export type FactorStatus = 'unverified' | 'verified'
+
+export type AalLevel = 'aal1' | 'aal2' | 'aal3'
+
+export type CodeChallengeMethod = 's256' | 'plain'
+
+export type OneTimeTokenType = 'confirmation_token' | 'reauthentication_token' | 'recovery_token' | 'email_change_token_new' | 'email_change_token_current' | 'phone_change_token'
+
+export type OauthRegistrationType = 'dynamic' | 'manual'
+
+export type OauthAuthorizationStatus = 'pending' | 'approved' | 'denied' | 'expired'
+
+export type OauthResponseType = 'code'
+
+export type OauthClientType = 'public' | 'confidential'
+
+export type EqualityOp = 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte' | 'in'
+
+export type Action = 'INSERT' | 'UPDATE' | 'DELETE' | 'TRUNCATE' | 'ERROR'
+
+export type Buckettype = 'STANDARD' | 'ANALYTICS' | 'VECTOR'
+
+export type UserRole = 'user' | 'admin'
+
+export type StopType = 'camping' | 'stellplatz' | 'poi' | 'city' | 'address'
+
+export type CostType = 'per_night' | 'entry_fee' | 'none'
+
+export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+
+export type PlaceTypeEnum = 'camp_site' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction'
+
+export type EnrichmentStatusEnum = 'pending' | 'processing' | 'done' | 'failed' | 'needs_review'
+
+export type EnrichmentJobTypeEnum = 'enrich_llm' | 'refresh_osm' | 'google_places'
+
+export type JobStatusEnum = 'queued' | 'running' | 'done' | 'failed' | 'dead'
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string
+          email: string
+          role: string
+          created_at: string | null
+          full_name: string | null
+          home_city: string | null
+          home_city_coords: Json | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          role: string
+          created_at?: string | null
+          full_name?: string | null
+          home_city?: string | null
+          home_city_coords?: Json | null
+          updated_at: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          role?: string
+          created_at?: string | null
+          full_name?: string | null
+          home_city?: string | null
+          home_city_coords?: Json | null
+          updated_at?: string
+        }
+      }
+      trips: {
+        Row: {
+          id: string
+          user_id: string
+          start_location: string
+          end_location: string
+          start_date: string
+          end_date: string
+          total_distance: number
+          total_cost: number
+          created_at: string | null
+          start_coords: Json | null
+          end_coords: Json | null
+          route_geometry: Json | null
+          fuel_cost: number
+          toll_cost: number
+          is_shared: boolean | null
+          share_token: string | null
+          shared_at: string | null
+          start_location_geo: string | null
+          end_location_geo: string | null
+          name: string | null
+        }
+        Insert: {
+          id: string
+          user_id: string
+          start_location: string
+          end_location: string
+          start_date: string
+          end_date: string
+          total_distance: number
+          total_cost: number
+          created_at?: string | null
+          start_coords?: Json | null
+          end_coords?: Json | null
+          route_geometry?: Json | null
+          fuel_cost: number
+          toll_cost: number
+          is_shared?: boolean | null
+          share_token?: string | null
+          shared_at?: string | null
+          start_location_geo?: string | null
+          end_location_geo?: string | null
+          name?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          start_location?: string
+          end_location?: string
+          start_date?: string
+          end_date?: string
+          total_distance?: number
+          total_cost?: number
+          created_at?: string | null
+          start_coords?: Json | null
+          end_coords?: Json | null
+          route_geometry?: Json | null
+          fuel_cost?: number
+          toll_cost?: number
+          is_shared?: boolean | null
+          share_token?: string | null
+          shared_at?: string | null
+          start_location_geo?: string | null
+          end_location_geo?: string | null
+          name?: string | null
+        }
+      }
+      trip_stops: {
+        Row: {
+          id: string
+          trip_id: string
+          day_number: number
+          location_name: string
+          coordinates: Json
+          cost: number
+          type: string
+          name: string | null
+          rating: number | null
+          website: string | null
+          image: string | null
+          amenities: unknown[] | null
+          order_index: number | null
+          cost_type: string | null
+          notes: string | null
+          place_id: string | null
+          location_geo: string | null
+        }
+        Insert: {
+          id: string
+          trip_id: string
+          day_number: number
+          location_name: string
+          coordinates: Json
+          cost: number
+          type: string
+          name?: string | null
+          rating?: number | null
+          website?: string | null
+          image?: string | null
+          amenities?: unknown[] | null
+          order_index?: number | null
+          cost_type?: string | null
+          notes?: string | null
+          place_id?: string | null
+          location_geo?: string | null
+        }
+        Update: {
+          id?: string
+          trip_id?: string
+          day_number?: number
+          location_name?: string
+          coordinates?: Json
+          cost?: number
+          type?: string
+          name?: string | null
+          rating?: number | null
+          website?: string | null
+          image?: string | null
+          amenities?: unknown[] | null
+          order_index?: number | null
+          cost_type?: string | null
+          notes?: string | null
+          place_id?: string | null
+          location_geo?: string | null
+        }
+      }
+      campsites_cache: {
+        Row: {
+          id: string
+          place_id: string | null
+          name: string
+          lat: number
+          lng: number
+          rating: number | null
+          photo_url: string | null
+          estimated_price: number | null
+          place_types: unknown[] | null
+          last_updated: string | null
+          created_at: string | null
+          price_source: string | null
+          user_price_count: number | null
+          user_price_avg: number | null
+          description: string | null
+          description_source: string | null
+          description_generated_at: string | null
+          description_version: number | null
+          opening_hours: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          scraped_website_url: string | null
+          scraped_at: string | null
+          scraped_price_info: Json | null
+          scraped_data_source: string | null
+          google_data_fetched_at: string | null
+          google_data_expires_at: string | null
+          google_photos: Json | null
+          google_reviews: Json | null
+        }
+        Insert: {
+          id: string
+          place_id?: string | null
+          name: string
+          lat: number
+          lng: number
+          rating?: number | null
+          photo_url?: string | null
+          estimated_price?: number | null
+          place_types?: unknown[] | null
+          last_updated?: string | null
+          created_at?: string | null
+          price_source?: string | null
+          user_price_count?: number | null
+          user_price_avg?: number | null
+          description?: string | null
+          description_source?: string | null
+          description_generated_at?: string | null
+          description_version?: number | null
+          opening_hours?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          scraped_website_url?: string | null
+          scraped_at?: string | null
+          scraped_price_info?: Json | null
+          scraped_data_source?: string | null
+          google_data_fetched_at?: string | null
+          google_data_expires_at?: string | null
+          google_photos?: Json | null
+          google_reviews?: Json | null
+        }
+        Update: {
+          id?: string
+          place_id?: string | null
+          name?: string
+          lat?: number
+          lng?: number
+          rating?: number | null
+          photo_url?: string | null
+          estimated_price?: number | null
+          place_types?: unknown[] | null
+          last_updated?: string | null
+          created_at?: string | null
+          price_source?: string | null
+          user_price_count?: number | null
+          user_price_avg?: number | null
+          description?: string | null
+          description_source?: string | null
+          description_generated_at?: string | null
+          description_version?: number | null
+          opening_hours?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          scraped_website_url?: string | null
+          scraped_at?: string | null
+          scraped_price_info?: Json | null
+          scraped_data_source?: string | null
+          google_data_fetched_at?: string | null
+          google_data_expires_at?: string | null
+          google_photos?: Json | null
+          google_reviews?: Json | null
+        }
+      }
+      google_places_cache: {
+        Row: {
+          id: string
+          place_id: string
+          name: string | null
+          data: Json | null
+          fetched_at: string | null
+          expires_at: string | null
+        }
+        Insert: {
+          id: string
+          place_id: string
+          name?: string | null
+          data?: Json | null
+          fetched_at?: string | null
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          place_id?: string
+          name?: string | null
+          data?: Json | null
+          fetched_at?: string | null
+          expires_at?: string | null
+        }
+      }
+      app_errors: {
+        Row: {
+          id: string
+          error_type: string
+          message: string
+          stack_trace: string | null
+          location: string | null
+          user_id: string | null
+          user_agent: string | null
+          metadata: Json | null
+          status: string
+          created_at: string | null
+        }
+        Insert: {
+          id: string
+          error_type: string
+          message: string
+          stack_trace?: string | null
+          location?: string | null
+          user_id?: string | null
+          user_agent?: string | null
+          metadata?: Json | null
+          status: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          error_type?: string
+          message?: string
+          stack_trace?: string | null
+          location?: string | null
+          user_id?: string | null
+          user_agent?: string | null
+          metadata?: Json | null
+          status?: string
+          created_at?: string | null
+        }
+      }
+      campsite_prices: {
+        Row: {
+          id: string
+          place_id: string
+          user_id: string | null
+          price_per_night: number
+          price_type: string | null
+          currency: string | null
+          rating: number | null
+          review_text: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id: string
+          place_id: string
+          user_id?: string | null
+          price_per_night: number
+          price_type?: string | null
+          currency?: string | null
+          rating?: number | null
+          review_text?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          place_id?: string
+          user_id?: string | null
+          price_per_night?: number
+          price_type?: string | null
+          currency?: string | null
+          rating?: number | null
+          review_text?: string | null
+          created_at?: string | null
+        }
+      }
+      favorites: {
+        Row: {
+          id: string
+          user_id: string
+          place_id: string
+          name: string
+          coordinates: Json
+          type: string
+          amenities: unknown[] | null
+          rating: number | null
+          created_at: string
+          location_geo: string | null
+        }
+        Insert: {
+          id: string
+          user_id: string
+          place_id: string
+          name: string
+          coordinates: Json
+          type: string
+          amenities?: unknown[] | null
+          rating?: number | null
+          created_at: string
+          location_geo?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          place_id?: string
+          name?: string
+          coordinates?: Json
+          type?: string
+          amenities?: unknown[] | null
+          rating?: number | null
+          created_at?: string
+          location_geo?: string | null
+        }
+      }
+      vehicle_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          max_speed: number | null
+          height: number | null
+          weight: number | null
+          fuel_consumption: number | null
+          is_default: boolean | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          user_id: string
+          name: string
+          max_speed?: number | null
+          height?: number | null
+          weight?: number | null
+          fuel_consumption?: number | null
+          is_default?: boolean | null
+          created_at: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          max_speed?: number | null
+          height?: number | null
+          weight?: number | null
+          fuel_consumption?: number | null
+          is_default?: boolean | null
+          created_at?: string
+        }
+      }
+      trip_reminders: {
+        Row: {
+          id: string
+          trip_id: string
+          user_id: string
+          reminder_days_before: number
+          is_active: boolean
+          last_sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          trip_id: string
+          user_id: string
+          reminder_days_before: number
+          is_active: boolean
+          last_sent_at?: string | null
+          created_at: string
+        }
+        Update: {
+          id?: string
+          trip_id?: string
+          user_id?: string
+          reminder_days_before?: number
+          is_active?: boolean
+          last_sent_at?: string | null
+          created_at?: string
+        }
+      }
+      campsite_reviews: {
+        Row: {
+          id: string
+          user_id: string
+          place_id: string
+          place_name: string
+          rating: number
+          comment: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id: string
+          user_id: string
+          place_id: string
+          place_name: string
+          rating: number
+          comment?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          place_id?: string
+          place_name?: string
+          rating?: number
+          comment?: string | null
+          created_at?: string | null
+        }
+      }
+      description_generation_jobs: {
+        Row: {
+          id: string
+          place_id: string
+          status: string | null
+          priority: number | null
+          attempts: number | null
+          error_message: string | null
+          created_at: string | null
+          updated_at: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id: string
+          place_id: string
+          status?: string | null
+          priority?: number | null
+          attempts?: number | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          place_id?: string
+          status?: string | null
+          priority?: number | null
+          attempts?: number | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          completed_at?: string | null
+        }
+      }
+      website_scraping_jobs: {
+        Row: {
+          id: string
+          place_id: string
+          website_url: string
+          status: string | null
+          priority: number | null
+          attempts: number | null
+          extracted_data: Json | null
+          error_message: string | null
+          created_at: string | null
+          updated_at: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id: string
+          place_id: string
+          website_url: string
+          status?: string | null
+          priority?: number | null
+          attempts?: number | null
+          extracted_data?: Json | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          place_id?: string
+          website_url?: string
+          status?: string | null
+          priority?: number | null
+          attempts?: number | null
+          extracted_data?: Json | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          completed_at?: string | null
+        }
+      }
+      spatial_ref_sys: {
+        Row: {
+          srid: number
+          auth_name: string | null
+          auth_srid: number | null
+          srtext: string | null
+          proj4text: string | null
+        }
+        Insert: {
+          srid: number
+          auth_name?: string | null
+          auth_srid?: number | null
+          srtext?: string | null
+          proj4text?: string | null
+        }
+        Update: {
+          srid?: number
+          auth_name?: string | null
+          auth_srid?: number | null
+          srtext?: string | null
+          proj4text?: string | null
+        }
+      }
+      places: {
+        Row: {
+          id: number
+          place_type: string
+          name: string
+          geom: string
+          lat: number | null
+          lon: number | null
+          country_code: string | null
+          region: string | null
+          city: string | null
+          postcode: string | null
+          address: string | null
+          has_toilet: boolean
+          has_shower: boolean
+          has_electricity: boolean
+          has_water: boolean
+          has_wifi: boolean
+          pet_friendly: boolean
+          caravan_allowed: boolean
+          motorhome_allowed: boolean
+          tent_allowed: boolean
+          website: string | null
+          phone: string | null
+          email: string | null
+          opening_hours: string | null
+          fee_info: string | null
+          source_primary: string
+          data_confidence: number | null
+          last_seen_at: string | null
+          last_enriched_at: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          place_type: string
+          name: string
+          geom: string
+          lat?: number | null
+          lon?: number | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          has_toilet: boolean
+          has_shower: boolean
+          has_electricity: boolean
+          has_water: boolean
+          has_wifi: boolean
+          pet_friendly: boolean
+          caravan_allowed: boolean
+          motorhome_allowed: boolean
+          tent_allowed: boolean
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          source_primary: string
+          data_confidence?: number | null
+          last_seen_at?: string | null
+          last_enriched_at?: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          place_type?: string
+          name?: string
+          geom?: string
+          lat?: number | null
+          lon?: number | null
+          country_code?: string | null
+          region?: string | null
+          city?: string | null
+          postcode?: string | null
+          address?: string | null
+          has_toilet?: boolean
+          has_shower?: boolean
+          has_electricity?: boolean
+          has_water?: boolean
+          has_wifi?: boolean
+          pet_friendly?: boolean
+          caravan_allowed?: boolean
+          motorhome_allowed?: boolean
+          tent_allowed?: boolean
+          website?: string | null
+          phone?: string | null
+          email?: string | null
+          opening_hours?: string | null
+          fee_info?: string | null
+          source_primary?: string
+          data_confidence?: number | null
+          last_seen_at?: string | null
+          last_enriched_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      osm_source: {
+        Row: {
+          id: number
+          place_id: number
+          osm_type: string
+          osm_id: number
+          osm_version: number | null
+          tags: Json
+          raw_name: string | null
+          source_snapshot_date: string | null
+          imported_at: string
+          first_seen_at: string
+          last_seen_at: string
+          last_import_run_id: number | null
+          geometry_kind: string | null
+          geometry_hash: string | null
+          centroid: string | null
+          geom: string | null
+          osm_timestamp: string | null
+          osmium_unique_id: string | null
+          first_seen_snapshot_id: string | null
+          last_seen_snapshot_id: string | null
+          is_current: boolean
+          source_metadata: Json
+        }
+        Insert: {
+          id: number
+          place_id: number
+          osm_type: string
+          osm_id: number
+          osm_version?: number | null
+          tags: Json
+          raw_name?: string | null
+          source_snapshot_date?: string | null
+          imported_at: string
+          first_seen_at: string
+          last_seen_at: string
+          last_import_run_id?: number | null
+          geometry_kind?: string | null
+          geometry_hash?: string | null
+          centroid?: string | null
+          geom?: string | null
+          osm_timestamp?: string | null
+          osmium_unique_id?: string | null
+          first_seen_snapshot_id?: string | null
+          last_seen_snapshot_id?: string | null
+          is_current: boolean
+          source_metadata: Json
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          osm_type?: string
+          osm_id?: number
+          osm_version?: number | null
+          tags?: Json
+          raw_name?: string | null
+          source_snapshot_date?: string | null
+          imported_at?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          last_import_run_id?: number | null
+          geometry_kind?: string | null
+          geometry_hash?: string | null
+          centroid?: string | null
+          geom?: string | null
+          osm_timestamp?: string | null
+          osmium_unique_id?: string | null
+          first_seen_snapshot_id?: string | null
+          last_seen_snapshot_id?: string | null
+          is_current?: boolean
+          source_metadata?: Json
+        }
+      }
+      place_enrichment: {
+        Row: {
+          id: number
+          place_id: number
+          status: string
+          provider: string | null
+          model: string | null
+          prompt_version: string | null
+          source_urls: Json
+          extracted: Json
+          summary_de: string | null
+          confidence: number | null
+          hallucination_risk: number | null
+          token_input: number | null
+          token_output: number | null
+          cost_usd: number | null
+          validation_errors: Json
+          created_at: string
+          completed_at: string | null
+          source_evidence: Json | null
+          evidence_markers: Json | null
+          collection_status: string | null
+          failure_classification: string | null
+          provider_attempts: Json | null
+          job_cost_usd: number | null
+          enrichment_schema_version: string | null
+        }
+        Insert: {
+          id: number
+          place_id: number
+          status: string
+          provider?: string | null
+          model?: string | null
+          prompt_version?: string | null
+          source_urls: Json
+          extracted: Json
+          summary_de?: string | null
+          confidence?: number | null
+          hallucination_risk?: number | null
+          token_input?: number | null
+          token_output?: number | null
+          cost_usd?: number | null
+          validation_errors: Json
+          created_at: string
+          completed_at?: string | null
+          source_evidence?: Json | null
+          evidence_markers?: Json | null
+          collection_status?: string | null
+          failure_classification?: string | null
+          provider_attempts?: Json | null
+          job_cost_usd?: number | null
+          enrichment_schema_version?: string | null
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          status?: string
+          provider?: string | null
+          model?: string | null
+          prompt_version?: string | null
+          source_urls?: Json
+          extracted?: Json
+          summary_de?: string | null
+          confidence?: number | null
+          hallucination_risk?: number | null
+          token_input?: number | null
+          token_output?: number | null
+          cost_usd?: number | null
+          validation_errors?: Json
+          created_at?: string
+          completed_at?: string | null
+          source_evidence?: Json | null
+          evidence_markers?: Json | null
+          collection_status?: string | null
+          failure_classification?: string | null
+          provider_attempts?: Json | null
+          job_cost_usd?: number | null
+          enrichment_schema_version?: string | null
+        }
+      }
+      enrichment_jobs: {
+        Row: {
+          id: number
+          place_id: number
+          job_type: string
+          priority: number
+          status: string
+          attempts: number
+          max_attempts: number
+          run_after: string
+          locked_by: string | null
+          locked_at: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+          freshness_bucket: string
+          lease_expires_at: string | null
+          heartbeat_at: string | null
+          payload: Json
+          context: Json
+          last_error_at: string | null
+          dead_lettered_at: string | null
+          classification: string | null
+          source_state: string | null
+          worker_id: string | null
+          attempt_number: number | null
+          last_error_code: string | null
+          last_error_message: string | null
+          canonical_place_id: string | null
+          metadata: Json | null
+        }
+        Insert: {
+          id: number
+          place_id: number
+          job_type: string
+          priority: number
+          status: string
+          attempts: number
+          max_attempts: number
+          run_after: string
+          locked_by?: string | null
+          locked_at?: string | null
+          error_message?: string | null
+          created_at: string
+          updated_at: string
+          freshness_bucket: string
+          lease_expires_at?: string | null
+          heartbeat_at?: string | null
+          payload: Json
+          context: Json
+          last_error_at?: string | null
+          dead_lettered_at?: string | null
+          classification?: string | null
+          source_state?: string | null
+          worker_id?: string | null
+          attempt_number?: number | null
+          last_error_code?: string | null
+          last_error_message?: string | null
+          canonical_place_id?: string | null
+          metadata?: Json | null
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          job_type?: string
+          priority?: number
+          status?: string
+          attempts?: number
+          max_attempts?: number
+          run_after?: string
+          locked_by?: string | null
+          locked_at?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+          freshness_bucket?: string
+          lease_expires_at?: string | null
+          heartbeat_at?: string | null
+          payload?: Json
+          context?: Json
+          last_error_at?: string | null
+          dead_lettered_at?: string | null
+          classification?: string | null
+          source_state?: string | null
+          worker_id?: string | null
+          attempt_number?: number | null
+          last_error_code?: string | null
+          last_error_message?: string | null
+          canonical_place_id?: string | null
+          metadata?: Json | null
+        }
+      }
+      cutover_audit_log: {
+        Row: {
+          id: number
+          event_type: string
+          level: string
+          payload: Json
+          created_at: string
+        }
+        Insert: {
+          id: number
+          event_type: string
+          level: string
+          payload: Json
+          created_at: string
+        }
+        Update: {
+          id?: number
+          event_type?: string
+          level?: string
+          payload?: Json
+          created_at?: string
+        }
+      }
+      cutover_metric_snapshots: {
+        Row: {
+          id: number
+          import_coverage_ratio: number
+          queue_backlog: number
+          job_failures_24h: number
+          freshness_stale_count: number
+          enrichment_spend_usd_24h: number
+          google_calls_24h: number
+          canonical_legacy_divergence: number
+          unresolved_mappings: number
+          created_at: string
+        }
+        Insert: {
+          id: number
+          import_coverage_ratio: number
+          queue_backlog: number
+          job_failures_24h: number
+          freshness_stale_count: number
+          enrichment_spend_usd_24h: number
+          google_calls_24h: number
+          canonical_legacy_divergence: number
+          unresolved_mappings: number
+          created_at: string
+        }
+        Update: {
+          id?: number
+          import_coverage_ratio?: number
+          queue_backlog?: number
+          job_failures_24h?: number
+          freshness_stale_count?: number
+          enrichment_spend_usd_24h?: number
+          google_calls_24h?: number
+          canonical_legacy_divergence?: number
+          unresolved_mappings?: number
+          created_at?: string
+        }
+      }
+      cutover_runtime_flags: {
+        Row: {
+          key: string
+          value: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: string
+          updated_at: string
+        }
+        Update: {
+          key?: string
+          value?: string
+          updated_at?: string
+        }
+      }
+      osm_import_jobs: {
+        Row: {
+          id: string
+          job_type: string
+          status: string
+          started_at: string | null
+          completed_at: string | null
+          result: Json | null
+          error_message: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          job_type: string
+          status: string
+          started_at?: string | null
+          completed_at?: string | null
+          result?: Json | null
+          error_message?: string | null
+          created_by?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: string
+          job_type?: string
+          status?: string
+          started_at?: string | null
+          completed_at?: string | null
+          result?: Json | null
+          error_message?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      osm_import_runs: {
+        Row: {
+          id: number
+          source: string
+          status: string
+          bbox: Json | null
+          tile_count: number
+          fetched_count: number
+          normalized_count: number
+          imported_count: number
+          created_count: number
+          updated_count: number
+          noop_count: number
+          failed_count: number
+          stale_marked_inactive_count: number
+          error_messages: Json
+          started_at: string
+          finished_at: string | null
+          run_kind: string
+          ingestion_provider: string
+          tile_key: string | null
+          parent_run_id: number | null
+          queue_job_id: number | null
+          current_tile: number | null
+          total_tiles: number | null
+        }
+        Insert: {
+          id: number
+          source: string
+          status: string
+          bbox?: Json | null
+          tile_count: number
+          fetched_count: number
+          normalized_count: number
+          imported_count: number
+          created_count: number
+          updated_count: number
+          noop_count: number
+          failed_count: number
+          stale_marked_inactive_count: number
+          error_messages: Json
+          started_at: string
+          finished_at?: string | null
+          run_kind: string
+          ingestion_provider: string
+          tile_key?: string | null
+          parent_run_id?: number | null
+          queue_job_id?: number | null
+          current_tile?: number | null
+          total_tiles?: number | null
+        }
+        Update: {
+          id?: number
+          source?: string
+          status?: string
+          bbox?: Json | null
+          tile_count?: number
+          fetched_count?: number
+          normalized_count?: number
+          imported_count?: number
+          created_count?: number
+          updated_count?: number
+          noop_count?: number
+          failed_count?: number
+          stale_marked_inactive_count?: number
+          error_messages?: Json
+          started_at?: string
+          finished_at?: string | null
+          run_kind?: string
+          ingestion_provider?: string
+          tile_key?: string | null
+          parent_run_id?: number | null
+          queue_job_id?: number | null
+          current_tile?: number | null
+          total_tiles?: number | null
+        }
+      }
+      osm_refresh_jobs: {
+        Row: {
+          id: number
+          tile_key: string
+          bbox: Json
+          source_provider: string
+          status: string
+          attempts: number
+          max_attempts: number
+          priority: number
+          run_after: string
+          locked_by: string | null
+          lease_expires_at: string | null
+          last_run_id: number | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          tile_key: string
+          bbox: Json
+          source_provider: string
+          status: string
+          attempts: number
+          max_attempts: number
+          priority: number
+          run_after: string
+          locked_by?: string | null
+          lease_expires_at?: string | null
+          last_run_id?: number | null
+          error_message?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          tile_key?: string
+          bbox?: Json
+          source_provider?: string
+          status?: string
+          attempts?: number
+          max_attempts?: number
+          priority?: number
+          run_after?: string
+          locked_by?: string | null
+          lease_expires_at?: string | null
+          last_run_id?: number | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      osm_import_queue: {
+        Row: {
+          id: number
+          job_type: string
+          status: string
+          bbox: Json | null
+          options: Json | null
+          priority: number | null
+          worker_id: string | null
+          job_reference_id: string | null
+          error_message: string | null
+          created_at: string
+          started_at: string | null
+          completed_at: string | null
+          updated_at: string
+          country_code: string | null
+          source_type: string | null
+          retry_count: number
+        }
+        Insert: {
+          id: number
+          job_type: string
+          status: string
+          bbox?: Json | null
+          options?: Json | null
+          priority?: number | null
+          worker_id?: string | null
+          job_reference_id?: string | null
+          error_message?: string | null
+          created_at: string
+          started_at?: string | null
+          completed_at?: string | null
+          updated_at: string
+          country_code?: string | null
+          source_type?: string | null
+          retry_count: number
+        }
+        Update: {
+          id?: number
+          job_type?: string
+          status?: string
+          bbox?: Json | null
+          options?: Json | null
+          priority?: number | null
+          worker_id?: string | null
+          job_reference_id?: string | null
+          error_message?: string | null
+          created_at?: string
+          started_at?: string | null
+          completed_at?: string | null
+          updated_at?: string
+          country_code?: string | null
+          source_type?: string | null
+          retry_count?: number
+        }
+      }
+      app_settings: {
+        Row: {
+          id: string
+          key: string
+          category: string
+          type: string
+          value: Json
+          encrypted: boolean | null
+          description: string | null
+          validation_rules: Json | null
+          is_archived: boolean | null
+          created_by: string | null
+          updated_by: string | null
+          created_at: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          id: string
+          key: string
+          category: string
+          type: string
+          value: Json
+          encrypted?: boolean | null
+          description?: string | null
+          validation_rules?: Json | null
+          is_archived?: boolean | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          id?: string
+          key?: string
+          category?: string
+          type?: string
+          value?: Json
+          encrypted?: boolean | null
+          description?: string | null
+          validation_rules?: Json | null
+          is_archived?: boolean | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+      }
+      settings_audit_log: {
+        Row: {
+          id: string
+          setting_key: string
+          operation: string
+          old_value: Json | null
+          new_value: Json | null
+          performed_by: string | null
+          performed_at: string | null
+          client_ip: string | null
+        }
+        Insert: {
+          id: string
+          setting_key: string
+          operation: string
+          old_value?: Json | null
+          new_value?: Json | null
+          performed_by?: string | null
+          performed_at?: string | null
+          client_ip?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          operation?: string
+          old_value?: Json | null
+          new_value?: Json | null
+          performed_by?: string | null
+          performed_at?: string | null
+          client_ip?: string | null
+        }
+      }
+      countries: {
+        Row: {
+          iso_code: string
+          name: string
+          geofabrik_name: string
+          geofabrik_url: string
+          bounding_box: Json
+          created_at: string | null
+        }
+        Insert: {
+          iso_code: string
+          name: string
+          geofabrik_name: string
+          geofabrik_url: string
+          bounding_box: Json
+          created_at?: string | null
+        }
+        Update: {
+          iso_code?: string
+          name?: string
+          geofabrik_name?: string
+          geofabrik_url?: string
+          bounding_box?: Json
+          created_at?: string | null
+        }
+      }
+      country_import_status: {
+        Row: {
+          id: string
+          country_code: string
+          status: string
+          source_type: string
+          started_at: string | null
+          completed_at: string | null
+          poi_count: number | null
+          error_message: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id: string
+          country_code: string
+          status: string
+          source_type: string
+          started_at?: string | null
+          completed_at?: string | null
+          poi_count?: number | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          country_code?: string
+          status?: string
+          source_type?: string
+          started_at?: string | null
+          completed_at?: string | null
+          poi_count?: number | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      import_snapshot: {
+        Row: {
+          id: string
+          region: string
+          source_name: string
+          source_pbf_date: string | null
+          source_state: string | null
+          imported_at: string
+          matched_count: number | null
+          created_count: number | null
+          stale_count: number | null
+          duplicate_candidates_count: number | null
+          error_count: number | null
+        }
+        Insert: {
+          id: string
+          region: string
+          source_name: string
+          source_pbf_date?: string | null
+          source_state?: string | null
+          imported_at: string
+          matched_count?: number | null
+          created_count?: number | null
+          stale_count?: number | null
+          duplicate_candidates_count?: number | null
+          error_count?: number | null
+        }
+        Update: {
+          id?: string
+          region?: string
+          source_name?: string
+          source_pbf_date?: string | null
+          source_state?: string | null
+          imported_at?: string
+          matched_count?: number | null
+          created_count?: number | null
+          stale_count?: number | null
+          duplicate_candidates_count?: number | null
+          error_count?: number | null
+        }
+      }
+      osm_type_transitions: {
+        Row: {
+          id: number
+          old_osm_type: string
+          old_osm_id: number
+          new_osm_type: string
+          new_osm_id: number
+          detected_at: string
+          transition_type: string | null
+          confidence: number | null
+          merge_decision: string | null
+          merged_place_id: number | null
+        }
+        Insert: {
+          id: number
+          old_osm_type: string
+          old_osm_id: number
+          new_osm_type: string
+          new_osm_id: number
+          detected_at: string
+          transition_type?: string | null
+          confidence?: number | null
+          merge_decision?: string | null
+          merged_place_id?: number | null
+        }
+        Update: {
+          id?: number
+          old_osm_type?: string
+          old_osm_id?: number
+          new_osm_type?: string
+          new_osm_id?: number
+          detected_at?: string
+          transition_type?: string | null
+          confidence?: number | null
+          merge_decision?: string | null
+          merged_place_id?: number | null
+        }
+      }
+      place_duplicate_candidates: {
+        Row: {
+          id: number
+          primary_place_id: number
+          duplicate_place_id: number | null
+          candidate_osm_type: string | null
+          candidate_osm_id: number | null
+          candidate_geometry_kind: string | null
+          match_type: string
+          match_score: number
+          distance_meters: number | null
+          name_similarity: number | null
+          detected_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          resolution: string | null
+          resolution_notes: string | null
+        }
+        Insert: {
+          id: number
+          primary_place_id: number
+          duplicate_place_id?: number | null
+          candidate_osm_type?: string | null
+          candidate_osm_id?: number | null
+          candidate_geometry_kind?: string | null
+          match_type: string
+          match_score: number
+          distance_meters?: number | null
+          name_similarity?: number | null
+          detected_at: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          resolution?: string | null
+          resolution_notes?: string | null
+        }
+        Update: {
+          id?: number
+          primary_place_id?: number
+          duplicate_place_id?: number | null
+          candidate_osm_type?: string | null
+          candidate_osm_id?: number | null
+          candidate_geometry_kind?: string | null
+          match_type?: string
+          match_score?: number
+          distance_meters?: number | null
+          name_similarity?: number | null
+          detected_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          resolution?: string | null
+          resolution_notes?: string | null
+        }
+      }
+      place_llm_enrichments: {
+        Row: {
+          id: number
+          place_id: number
+          job_id: number | null
+          provider: string
+          model: string
+          prompt_version: string | null
+          summary_de: string | null
+          confidence: number | null
+          hallucination_risk: number | null
+          token_input: number | null
+          token_output: number | null
+          cost_usd: number | null
+          status: string
+          started_at: string | null
+          completed_at: string | null
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id: number
+          place_id: number
+          job_id?: number | null
+          provider: string
+          model: string
+          prompt_version?: string | null
+          summary_de?: string | null
+          confidence?: number | null
+          hallucination_risk?: number | null
+          token_input?: number | null
+          token_output?: number | null
+          cost_usd?: number | null
+          status: string
+          started_at?: string | null
+          completed_at?: string | null
+          is_current: boolean
+          created_at: string
+          updated_at: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          job_id?: number | null
+          provider?: string
+          model?: string
+          prompt_version?: string | null
+          summary_de?: string | null
+          confidence?: number | null
+          hallucination_risk?: number | null
+          token_input?: number | null
+          token_output?: number | null
+          cost_usd?: number | null
+          status?: string
+          started_at?: string | null
+          completed_at?: string | null
+          is_current?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+      }
+      place_source_evidence_runs: {
+        Row: {
+          id: number
+          place_id: number
+          job_id: number | null
+          worker_id: string | null
+          attempt_number: number
+          collection_status: string
+          source_urls: Json | null
+          source_evidence: Json | null
+          evidence_markers: Json | null
+          trusted_source_count: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          place_id: number
+          job_id?: number | null
+          worker_id?: string | null
+          attempt_number: number
+          collection_status: string
+          source_urls?: Json | null
+          source_evidence?: Json | null
+          evidence_markers?: Json | null
+          trusted_source_count?: number | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          job_id?: number | null
+          worker_id?: string | null
+          attempt_number?: number
+          collection_status?: string
+          source_urls?: Json | null
+          source_evidence?: Json | null
+          evidence_markers?: Json | null
+          trusted_source_count?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      place_google_sources: {
+        Row: {
+          id: number
+          place_id: number
+          google_place_id: string
+          name: string | null
+          formatted_address: string | null
+          phone: string | null
+          website: string | null
+          rating: number | null
+          review_count: number | null
+          business_status: string | null
+          lat: number | null
+          lon: number | null
+          raw_payload: Json | null
+          fetched_at: string
+          expires_at: string | null
+          is_current: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          place_id: number
+          google_place_id: string
+          name?: string | null
+          formatted_address?: string | null
+          phone?: string | null
+          website?: string | null
+          rating?: number | null
+          review_count?: number | null
+          business_status?: string | null
+          lat?: number | null
+          lon?: number | null
+          raw_payload?: Json | null
+          fetched_at: string
+          expires_at?: string | null
+          is_current: boolean
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          google_place_id?: string
+          name?: string | null
+          formatted_address?: string | null
+          phone?: string | null
+          website?: string | null
+          rating?: number | null
+          review_count?: number | null
+          business_status?: string | null
+          lat?: number | null
+          lon?: number | null
+          raw_payload?: Json | null
+          fetched_at?: string
+          expires_at?: string | null
+          is_current?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      place_llm_facts: {
+        Row: {
+          id: number
+          llm_enrichment_id: number
+          field_name: string
+          value_text: string | null
+          value_type: string
+          confidence: number | null
+          provenance_kind: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          llm_enrichment_id: number
+          field_name: string
+          value_text?: string | null
+          value_type: string
+          confidence?: number | null
+          provenance_kind?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          llm_enrichment_id?: number
+          field_name?: string
+          value_text?: string | null
+          value_type?: string
+          confidence?: number | null
+          provenance_kind?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      place_llm_sources: {
+        Row: {
+          id: number
+          llm_enrichment_id: number
+          source_url: string
+          source_domain: string | null
+          source_kind: string
+          trusted: boolean | null
+          relevance_score: number | null
+          fetched_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id: number
+          llm_enrichment_id: number
+          source_url: string
+          source_domain?: string | null
+          source_kind: string
+          trusted?: boolean | null
+          relevance_score?: number | null
+          fetched_at?: string | null
+          created_at: string
+        }
+        Update: {
+          id?: number
+          llm_enrichment_id?: number
+          source_url?: string
+          source_domain?: string | null
+          source_kind?: string
+          trusted?: boolean | null
+          relevance_score?: number | null
+          fetched_at?: string | null
+          created_at?: string
+        }
+      }
+      place_llm_evidence_markers: {
+        Row: {
+          id: number
+          llm_enrichment_id: number
+          field_name: string
+          marker_text: string
+          marker_type: string
+          confidence: number | null
+          created_at: string
+        }
+        Insert: {
+          id: number
+          llm_enrichment_id: number
+          field_name: string
+          marker_text: string
+          marker_type: string
+          confidence?: number | null
+          created_at: string
+        }
+        Update: {
+          id?: number
+          llm_enrichment_id?: number
+          field_name?: string
+          marker_text?: string
+          marker_type?: string
+          confidence?: number | null
+          created_at?: string
+        }
+      }
+      place_evidence_sources: {
+        Row: {
+          id: number
+          evidence_run_id: number
+          source_url: string
+          source_domain: string | null
+          fetch_status: string
+          http_status: number | null
+          trusted: boolean | null
+          content_type: string | null
+          fetched_at: string | null
+          content_length: number | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          evidence_run_id: number
+          source_url: string
+          source_domain?: string | null
+          fetch_status: string
+          http_status?: number | null
+          trusted?: boolean | null
+          content_type?: string | null
+          fetched_at?: string | null
+          content_length?: number | null
+          error_message?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          evidence_run_id?: number
+          source_url?: string
+          source_domain?: string | null
+          fetch_status?: string
+          http_status?: number | null
+          trusted?: boolean | null
+          content_type?: string | null
+          fetched_at?: string | null
+          content_length?: number | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      place_evidence_markers: {
+        Row: {
+          id: number
+          evidence_run_id: number
+          field_name: string
+          marker_text: string
+          marker_type: string
+          confidence: number | null
+          source_url: string | null
+          context_before: string | null
+          context_after: string | null
+          created_at: string
+        }
+        Insert: {
+          id: number
+          evidence_run_id: number
+          field_name: string
+          marker_text: string
+          marker_type: string
+          confidence?: number | null
+          source_url?: string | null
+          context_before?: string | null
+          context_after?: string | null
+          created_at: string
+        }
+        Update: {
+          id?: number
+          evidence_run_id?: number
+          field_name?: string
+          marker_text?: string
+          marker_type?: string
+          confidence?: number | null
+          source_url?: string | null
+          context_before?: string | null
+          context_after?: string | null
+          created_at?: string
+        }
+      }
+      place_google_reviews: {
+        Row: {
+          id: number
+          google_source_id: number
+          author_name: string | null
+          rating: number | null
+          language_code: string | null
+          review_text: string | null
+          review_time: string | null
+          relative_time_description: string | null
+          google_review_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: number
+          google_source_id: number
+          author_name?: string | null
+          rating?: number | null
+          language_code?: string | null
+          review_text?: string | null
+          review_time?: string | null
+          relative_time_description?: string | null
+          google_review_id?: string | null
+          created_at: string
+        }
+        Update: {
+          id?: number
+          google_source_id?: number
+          author_name?: string | null
+          rating?: number | null
+          language_code?: string | null
+          review_text?: string | null
+          review_time?: string | null
+          relative_time_description?: string | null
+          google_review_id?: string | null
+          created_at?: string
+        }
+      }
+      place_google_photos: {
+        Row: {
+          id: number
+          google_source_id: number
+          photo_reference: string
+          width: number | null
+          height: number | null
+          attribution: string | null
+          google_photo_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: number
+          google_source_id: number
+          photo_reference: string
+          width?: number | null
+          height?: number | null
+          attribution?: string | null
+          google_photo_id?: string | null
+          created_at: string
+        }
+        Update: {
+          id?: number
+          google_source_id?: number
+          photo_reference?: string
+          width?: number | null
+          height?: number | null
+          attribution?: string | null
+          google_photo_id?: string | null
+          created_at?: string
+        }
+      }
+      place_google_types: {
+        Row: {
+          id: number
+          google_source_id: number
+          google_type: string
+          is_primary: boolean
+          created_at: string
+        }
+        Insert: {
+          id: number
+          google_source_id: number
+          google_type: string
+          is_primary: boolean
+          created_at: string
+        }
+        Update: {
+          id?: number
+          google_source_id?: number
+          google_type?: string
+          is_primary?: boolean
+          created_at?: string
+        }
+      }
+      place_google_amenities: {
+        Row: {
+          id: number
+          google_source_id: number
+          amenity_key: string
+          value_text: string | null
+          value_boolean: boolean | null
+          value_numeric: number | null
+          value_type: string
+          google_feature_type: string | null
+          is_verified: boolean
+          confidence_score: number | null
+          source_section: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          google_source_id: number
+          amenity_key: string
+          value_text?: string | null
+          value_boolean?: boolean | null
+          value_numeric?: number | null
+          value_type: string
+          google_feature_type?: string | null
+          is_verified: boolean
+          confidence_score?: number | null
+          source_section?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          google_source_id?: number
+          amenity_key?: string
+          value_text?: string | null
+          value_boolean?: boolean | null
+          value_numeric?: number | null
+          value_type?: string
+          google_feature_type?: string | null
+          is_verified?: boolean
+          confidence_score?: number | null
+          source_section?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      google_refresh_claims: {
+        Row: {
+          place_id: string
+          claimed_at: string
+          expires_at: string
+          worker_id: string
+          status: string
+          attempt_count: number
+          last_attempt_at: string
+          last_error: string | null
+          result_type: string | null
+          result_at: string | null
+          metadata: Json
+        }
+        Insert: {
+          place_id: string
+          claimed_at: string
+          expires_at: string
+          worker_id: string
+          status: string
+          attempt_count: number
+          last_attempt_at: string
+          last_error?: string | null
+          result_type?: string | null
+          result_at?: string | null
+          metadata: Json
+        }
+        Update: {
+          place_id?: string
+          claimed_at?: string
+          expires_at?: string
+          worker_id?: string
+          status?: string
+          attempt_count?: number
+          last_attempt_at?: string
+          last_error?: string | null
+          result_type?: string | null
+          result_at?: string | null
+          metadata?: Json
+        }
+      }
+    }
+    Views: {
+      campsite_full: {
+        Row: {
+          place_id: string | null
+          name: string | null
+          location: string | null
+          lat: number | null
+          lng: number | null
+          source_type: string | null
+          osm_id: string | null
+          osm_tags: Json | null
+          website: string | null
+          opening_hours: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          scraped_website_url: string | null
+          scraped_at: string | null
+          scraped_price_info: Json | null
+          scraped_data_source: string | null
+          description: string | null
+          description_source: string | null
+          description_generated_at: string | null
+          description_version: number | null
+          estimated_price: number | null
+          price_source: string | null
+          user_price_count: number | null
+          user_price_avg: number | null
+          place_types: unknown[] | null
+          created_at: string | null
+          updated_at: string | null
+          google_place_id: string | null
+          google_photos: Json | null
+          google_reviews: Json | null
+          google_data_fetched_at: string | null
+          google_data_expires_at: string | null
+          google_data_expired: boolean | null
+          review_count: number | null
+          avg_rating: number | null
+          user_price_entries: number | null
+          favorite_count: number | null
+          google_rating: number | null
+          rating: number | null
+          type: string | null
+          has_toilet: boolean | null
+          has_shower: boolean | null
+          has_electricity: boolean | null
+          has_dogs_allowed: boolean | null
+          has_wifi: boolean | null
+          has_beach: boolean | null
+          has_laundry: boolean | null
+          has_restaurant: boolean | null
+          has_bar: boolean | null
+          has_shop: boolean | null
+          has_pool: boolean | null
+          has_playground: boolean | null
+          has_dump_station: boolean | null
+          has_water: boolean | null
+          has_washing_machine: boolean | null
+          has_dishwasher: boolean | null
+        }
+      }
+      campsite_review_summary: {
+        Row: {
+          place_id: string | null
+          place_name: string | null
+          review_count: number | null
+          avg_rating: number | null
+          min_rating: number | null
+          max_rating: number | null
+        }
+      }
+      geography_columns: {
+        Row: {
+          f_table_catalog: string | null
+          f_table_schema: string | null
+          f_table_name: string | null
+          f_geography_column: string | null
+          coord_dimension: number | null
+          srid: number | null
+          type: string | null
+        }
+      }
+      geometry_columns: {
+        Row: {
+          f_table_catalog: string | null
+          f_table_schema: string | null
+          f_table_name: string | null
+          f_geometry_column: string | null
+          coord_dimension: number | null
+          srid: number | null
+          type: string | null
+        }
+      }
+      campsite_api_read_model: {
+        Row: {
+          place_id: string | null
+          name: string | null
+          location: string | null
+          lat: number | null
+          lng: number | null
+          source_type: string | null
+          osm_id: string | null
+          osm_tags: Json | null
+          website: string | null
+          opening_hours: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          scraped_website_url: string | null
+          scraped_at: string | null
+          scraped_price_info: Json | null
+          scraped_data_source: string | null
+          description: string | null
+          description_source: string | null
+          description_generated_at: string | null
+          description_version: number | null
+          estimated_price: number | null
+          price_source: string | null
+          user_price_count: number | null
+          user_price_avg: number | null
+          place_types: unknown[] | null
+          created_at: string | null
+          updated_at: string | null
+          google_place_id: string | null
+          google_photos: Json | null
+          google_reviews: Json | null
+          google_data_fetched_at: string | null
+          google_data_expires_at: string | null
+          google_data_expired: boolean | null
+          review_count: number | null
+          avg_rating: number | null
+          user_price_entries: number | null
+          favorite_count: number | null
+          google_rating: number | null
+          rating: number | null
+          type: string | null
+        }
+      }
+      campsite_price_summary: {
+        Row: {
+          place_id: string | null
+          osm_place_id: string | null
+          price_count: number | null
+          avg_price: number | null
+          min_price: number | null
+          max_price: number | null
+          avg_rating: number | null
+          review_count: number | null
+        }
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      factor_type: 'totp' | 'webauthn' | 'phone'
+      factor_status: 'unverified' | 'verified'
+      aal_level: 'aal1' | 'aal2' | 'aal3'
+      code_challenge_method: 's256' | 'plain'
+      one_time_token_type: 'confirmation_token' | 'reauthentication_token' | 'recovery_token' | 'email_change_token_new' | 'email_change_token_current' | 'phone_change_token'
+      oauth_registration_type: 'dynamic' | 'manual'
+      oauth_authorization_status: 'pending' | 'approved' | 'denied' | 'expired'
+      oauth_response_type: 'code'
+      oauth_client_type: 'public' | 'confidential'
+      equality_op: 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte' | 'in'
+      action: 'INSERT' | 'UPDATE' | 'DELETE' | 'TRUNCATE' | 'ERROR'
+      buckettype: 'STANDARD' | 'ANALYTICS' | 'VECTOR'
+      user_role: 'user' | 'admin'
+      stop_type: 'camping' | 'stellplatz' | 'poi' | 'city' | 'address'
+      cost_type: 'per_night' | 'entry_fee' | 'none'
+      job_status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+      place_type_enum: 'camp_site' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction'
+      enrichment_status_enum: 'pending' | 'processing' | 'done' | 'failed' | 'needs_review'
+      enrichment_job_type_enum: 'enrich_llm' | 'refresh_osm' | 'google_places'
+      job_status_enum: 'queued' | 'running' | 'done' | 'failed' | 'dead'
+    }
+  }
+}

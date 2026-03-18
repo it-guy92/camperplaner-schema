@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "0.0.1",
+  "schema_hash": "5928e2d4069bdad166f0d23a8597ebe93c14e7317ad94cadac8aaf40ee0ca6c3",
+  "generated_at": "2026-03-18T12:00:00.000Z",
+  "description": "Pinned artifact record - generated from schema migrations",
+  "artifacts": [
+    {
+      "name": "database.types.ts",
+      "description": "TypeScript type definitions generated from Supabase schema",
+      "source": "supabase migrations",
+      "source_repository": "https://github.com/it-guy92/camperplaner-schema",
+      "target_product": "apps/web/src/lib/database.types.ts",
+      "target_worker": "src/types/database.types.ts",
+      "checksum": "5928e2d4069bdad166f0d23a8597ebe93c14e7317ad94cadac8aaf40ee0ca6c3",
+      "status": "generated"
+    }
+  ],
+  "migrations": {
+    "latest": "20260317210003_source_family_constraints.sql",
+    "count": 27,
+    "pending_transfer": []
+  },
+  "contract_version": "1.0.0"
+}

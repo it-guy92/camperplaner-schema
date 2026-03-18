@@ -1,0 +1,268 @@
+name: Validate Migrations
+
+on:
+  push:
+    paths:
+      - 'supabase/migrations/*.sql'
+  pull_request:
+    paths:
+      - 'supabase/migrations/*.sql'
+
+jobs:
+  validate-naming:
+    name: Migration Naming Convention
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check migration file naming
+        run: |
+          echo "::group::Checking migration file naming convention"
+          
+          # Pattern: YYYYMMDDhhmmss_description.sql (24 chars timestamp + underscore)
+          # Valid: 20260314221355_fix_something.sql
+          # Invalid: 001_add_users.sql, V1__add_users.sql
+          
+          INVALID_NAMING=()
+          
+          for file in supabase/migrations/*.sql; do
+            # Skip if no files match
+            [ -e "$file" ] || continue
+            
+            # Get just the filename
+            filename=$(basename "$file")
+            
+            # Check if filename follows YYYYMMDDhhmmss_description.sql pattern
+            # Timestamp should be exactly 14 digits
+            if [[ ! "$filename" =~ ^[0-9]{14}_[a-zA-Z0-9_]+\.sql$ ]]; then
+              # Allow special named files like rollback_restructure.sql
+              if [[ ! "$filename" =~ ^(rollback_[a-zA-Z0-9_]+)\.sql$ ]]; then
+                INVALID_NAMING+=("$filename")
+                echo "  ❌ Invalid naming: $filename"
+              else
+                echo "  ℹ️  Special file (allowed): $filename"
+              fi
+            else
+              echo "  ✓ Valid: $filename"
+            fi
+          done
+          
+          echo "::endgroup::"
+          
+          if [ ${#INVALID_NAMING[@]} -gt 0 ]; then
+            echo ""
+            echo "❌ ERROR: The following migration files do not follow the naming convention."
+            echo ""
+            echo "Required pattern: YYYYMMDDhhmmss_description.sql"
+            echo "  - Timestamp: 14 digits (YYYYMMDDhhmmss)"
+            echo "  - Separator: Underscore (_ )"
+            echo "  - Description: lowercase_with_underscores"
+            echo "  - Extension: .sql"
+            echo ""
+            echo "Examples:"
+            echo "  ✓ 20260314221355_create_users_table.sql"
+            echo "  ✓ 20260315093000_add_user_email_index.sql"
+            echo ""
+            echo "Invalid files:"
+            printf '  - %s\n' "${INVALID_NAMING[@]}"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ All migration files follow the naming convention."
+
+  validate-sql-syntax:
+    name: SQL Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check SQL syntax
+        run: |
+          echo "::group::Checking SQL syntax"
+          
+          ERRORS=0
+          
+          for file in supabase/migrations/*.sql; do
+            # Skip if no files match
+            [ -e "$file" ] || continue
+            
+            filename=$(basename "$file")
+            
+            # Skip special files like rollback
+            if [[ "$filename" =~ ^rollback_.*\.sql$ ]]; then
+              echo "  ℹ️  Skipping rollback file: $filename"
+              continue
+            fi
+            
+            # Check for basic SQL syntax requirements
+            
+            # 1. Must start with valid SQL (CREATE, ALTER, DROP, INSERT, UPDATE, DELETE, BEGIN, etc.)
+            first_stmt=$(head -1 "$file" | sed 's/^[[:space:]]*//' | tr '[:lower:]' '[:upper:]')
+            valid_starts=("CREATE " "ALTER " "DROP " "INSERT " "UPDATE " "DELETE " "BEGIN" "SET " "GRANT " "REVOKE " "COMMENT " "SELECT " "--" "/*" "")
+            
+            starts_valid=false
+            for prefix in "${valid_starts[@]}"; do
+              if [[ "$first_stmt" == "$prefix"* ]]; then
+                starts_valid=true
+                break
+              fi
+            done
+            
+            if [ "$starts_valid" = false ]; then
+              echo "  ❌ $filename: Invalid or empty first statement"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+            
+            # 2. Check for unclosed blocks
+            open_parens=$(grep -o '(' "$file" 2>/dev/null | wc -l)
+            close_parens=$(grep -o ')' "$file" 2>/dev/null | wc -l)
+            
+            if [ "$open_parens" -ne "$close_parens" ]; then
+              echo "  ⚠️  $filename: Parentheses mismatch (open: $open_parens, close: $close_parens)"
+              # This is a warning, not an error - could be valid SQL
+            fi
+            
+            # 3. Check for common typos
+            if grep -q "CASCADE.*CASCADE" "$file"; then
+              echo "  ⚠️  $filename: Possible duplicate CASCADE keyword"
+            fi
+            
+            # 4. Check for semicolons at end of statements (basic check)
+            if ! grep -q ';' "$file"; then
+              echo "  ⚠️  $filename: No semicolons found - verify statement separation"
+            fi
+            
+            echo "  ✓ $filename: Basic syntax check passed"
+          done
+          
+          echo "::endgroup::"
+          
+          if [ $ERRORS -gt 0 ]; then
+            echo ""
+            echo "❌ Found $ERRORS file(s) with syntax issues."
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ SQL syntax validation passed."
+
+  check-timestamp-order:
+    name: Timestamp Ordering
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify chronological order
+        run: |
+          echo "::group::Checking migration timestamp ordering"
+          
+          timestamps=()
+          for file in supabase/migrations/*.sql; do
+            [ -e "$file" ] || continue
+            filename=$(basename "$file")
+            
+            # Skip special files
+            if [[ ! "$filename" =~ ^[0-9]{14} ]]; then
+              continue
+            fi
+            
+            timestamp=${filename:0:14}
+            timestamps+=("$timestamp:$file")
+          done
+          
+          # Sort and check for duplicates or non-chronological order
+          sorted=($(printf '%s\n' "${timestamps[@]}" | sort))
+          
+          prev_timestamp=""
+          has_issues=false
+          
+          for item in "${sorted[@]}"; do
+            IFS=':' read -r timestamp filepath <<< "$item"
+            filename=$(basename "$filepath")
+            
+            if [ -n "$prev_timestamp" ]; then
+              if [ "$timestamp" = "$prev_timestamp" ]; then
+                echo "  ❌ Duplicate timestamp: $timestamp in $filename"
+                has_issues=true
+              elif [ "$timestamp" -lt "$prev_timestamp" ]; then
+                echo "  ❌ Out of order: $filename ($timestamp < $prev_timestamp)"
+                has_issues=true
+              fi
+            fi
+            
+            prev_timestamp="$timestamp"
+          done
+          
+          # Check that files in git are chronologically ordered
+          echo ""
+          echo "Verifying file system order matches timestamp order..."
+          
+          for file in supabase/migrations/*.sql; do
+            [ -e "$file" ] || continue
+            filename=$(basename "$file")
+            
+            if [[ ! "$filename" =~ ^[0-9]{14} ]]; then
+              continue
+            fi
+            
+            echo "  $filename"
+          done
+          
+          echo "::endgroup::"
+          
+          if [ "$has_issues" = true ]; then
+            echo ""
+            echo "❌ Timestamp ordering issues found."
+            echo "Migration timestamps must be:"
+            echo "  - Unique (no duplicates)"
+            echo "  - Chronological (earlier first)"
+            echo "  - Use format: YYYYMMDDhhmmss"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ Timestamp ordering is valid."
+
+  check-conflict-markers:
+    name: No Conflict Markers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Search for conflict markers
+        run: |
+          echo "::group::Checking for merge conflict markers"
+          
+          CONFLICTS=0
+          
+          for file in supabase/migrations/*.sql; do
+            [ -e "$file" ] || continue
+            
+            filename=$(basename "$file")
+            
+            if grep -n "<<<<<<< HEAD\|=======\|>>>>>>>" "$file" > /dev/null 2>&1; then
+              echo "  ❌ $filename: Found merge conflict markers"
+              grep -n "<<<<<<< HEAD\|=======\|>>>>>>>" "$file"
+              CONFLICTS=$((CONFLICTS + 1))
+            fi
+          done
+          
+          echo "::endgroup::"
+          
+          if [ $CONFLICTS -gt 0 ]; then
+            echo ""
+            echo "❌ Found merge conflict markers in $CONFLICTS file(s)."
+            echo "Resolve conflicts before committing."
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ No merge conflict markers found."

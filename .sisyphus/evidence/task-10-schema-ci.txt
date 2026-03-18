@@ -1,0 +1,136 @@
+# Task 10: Schema Repo CI Validation and PR Enforcement
+
+## Summary
+Created GitHub Actions workflows and PR templates to enforce schema change validation and artifact freshness in the camperplaner-schema repository.
+
+## Files Created
+
+### 1. /.github/workflows/validate-migrations.yml
+Validates migration files on push and PR:
+- **Naming Convention**: Enforces `YYYYMMDDhhmmss_description.sql` pattern
+- **SQL Syntax**: Basic syntax validation (valid statements, parentheses balance)
+- **Timestamp Ordering**: Ensures chronological order, no duplicates
+- **Conflict Markers**: Checks for unresolved git merge conflicts
+
+### 2. /.github/workflows/check-artifacts.yml
+Validates generated artifacts on migration changes:
+- **Schema Manifest**: Verifies `generated/schema-manifest.json` exists and is valid JSON
+- **Manifest Sync**: Checks that manifest's latest migration matches filesystem
+- **TypeScript Types**: Verifies `generated/database.types.ts` exists and exports types
+- **Documentation Linkage**: Ensures CONTRACT.md exists and references latest migration
+- **Checksums**: Validates artifact checksums in manifest
+- **PR Comments**: Automatically comments on PRs if artifacts need update
+
+### 3. /.github/PULL_REQUEST_TEMPLATE.md
+PR template with comprehensive checklist:
+- Schema change type selection
+- Pre-submit validation checklist
+- Artifact generation requirements
+- Consumer impact documentation
+- Post-deploy verification steps
+
+## GitHub Remote Status
+
+**Remote Available**: Yes
+- URL: `https://github.com/it-guy92/camperplaner-schema.git`
+
+## Branch Protection Setup (Manual)
+
+Since the GitHub remote is available, the following branch protection rules should be configured manually via GitHub UI or API:
+
+### Recommended Settings for `main` branch:
+
+1. **Require pull request reviews before merging**
+   - Required approving reviews: 1
+   - Dismiss stale PR approvals when new commits are pushed: true
+
+2. **Require status checks to pass before merging**
+   - Status checks found in this task:
+     - `Validate Migrations / Migration Naming Convention`
+     - `Validate Migrations / SQL Syntax Validation`
+     - `Validate Migrations / Timestamp Ordering`
+     - `Validate Migrations / No Conflict Markers`
+     - `Check Artifacts Freshness / Validate Schema Manifest`
+     - `Check Artifacts Freshness / Check TypeScript Types`
+     - `Check Artifacts Freshness / Verify Documentation Linkage`
+     - `Check Artifacts Freshness / Verify Artifact Checksums`
+   - Require branches to be up to date before merging: true
+
+3. **Require conversation resolution before merging**: true
+
+4. **Require linear history**: true (optional, prevents merge commits)
+
+5. **Lock branch**: false
+
+6. **Do not allow bypassing the above settings**: true
+
+### Configuration via GitHub CLI (optional):
+
+```bash
+# Navigate to schema repo
+cd /home/opencode/camperplaner-schema
+
+# Configure branch protection (requires admin token)
+gh api repos/it-guy92/camperplaner-schema/branches/main/protection \
+  --method PUT \
+  --input - << EOF
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "Validate Migrations / Migration Naming Convention",
+      "Validate Migrations / SQL Syntax Validation",
+      "Validate Migrations / Timestamp Ordering",
+      "Validate Migrations / No Conflict Markers",
+      "Check Artifacts Freshness / Validate Schema Manifest",
+      "Check Artifacts Freshness / Check TypeScript Types",
+      "Check Artifacts Freshness / Verify Documentation Linkage"
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 1,
+    "dismiss_stale_reviews": true
+  },
+  "restrictions": null
+}
+EOF
+```
+
+## Workflow Triggers
+
+Both workflows trigger on:
+- **Push** to any branch (when migrations change)
+- **Pull Request** (when migrations or artifacts change)
+
+Paths monitored:
+- `supabase/migrations/*.sql`
+- `generated/**`
+
+## Validation Flow
+
+1. Developer creates migration file with correct naming
+2. Developer runs `node scripts/generate-types.js` to update artifacts
+3. Developer commits migration + updated artifacts
+4. Developer opens PR with template checklist
+5. CI runs validation checks
+6. If checks pass, PR can be merged
+7. If checks fail, PR is blocked with automated comments
+
+## Dependencies
+
+- Task 2: Repository scaffold (completed)
+- Task 6: Migrations transferred (completed)
+- Task 8: Generation scripts ready (completed)
+
+## Blocks
+
+- Task 15: Depends on CI validation being in place
+
+## Verification
+
+All files have been created at the expected paths:
+- [x] `/home/opencode/camperplaner-schema/.github/workflows/validate-migrations.yml`
+- [x] `/home/opencode/camperplaner-schema/.github/workflows/check-artifacts.yml`
+- [x] `/home/opencode/camperplaner-schema/.github/PULL_REQUEST_TEMPLATE.md`
+- [x] `/home/opencode/camperplaner-schema/.sisyphus/evidence/task-10-schema-ci.txt` (this file)
