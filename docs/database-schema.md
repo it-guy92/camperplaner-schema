@@ -439,6 +439,51 @@ The following items are NOT in Phase 1 scope:
 
 ---
 
+## RPC Functions
+
+### `get_place_source_bundle(BIGINT)` → JSONB
+
+**Purpose:** Returns a complete source bundle for a place by its BIGINT id.
+
+**Signature Change:** This function was updated from `get_place_source_bundle(UUID)` to `get_place_source_bundle(BIGINT)` to match the `places.id` column type.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `place_id` | bigint | The place ID from the `places` table |
+
+**Returns:** JSONB object with the following structure:
+```json
+{
+  "base": { /* places table row */ },
+  "osm": { /* current osm_source row or null */ },
+  "llm": { /* current place_llm_enrichments row or null */ },
+  "google": { /* current place_google_sources row or null */ },
+  "user_aggregates": {
+    "review_count": 0,
+    "avg_rating": null,
+    "favorite_count": 0
+  }
+}
+```
+
+**Behavior:**
+- Returns `NULL` if the place_id does not exist in the `places` table
+- Only includes current (is_current = true) source records
+- User aggregates are computed on-the-fly from `campsite_reviews` and `favorites`
+
+**Usage Example:**
+```sql
+SELECT get_place_source_bundle(12345);
+```
+
+**Migration Notes:**
+- **BREAKING:** Parameter type changed from UUID to BIGINT
+- Consumers must update API endpoints from `place_uuid` to `place_id`
+- Old function signature `get_place_source_bundle(UUID)` has been dropped
+
+---
+
 ## Regenerating Types
 
 ### Using the generate-types script
@@ -492,4 +537,4 @@ Per AGENTS.md, the deployment order is:
 
 ---
 
-*Last Updated: 2026-03-16*
+*Last Updated: 2026-03-18*
