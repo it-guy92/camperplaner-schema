@@ -1,0 +1,212 @@
+name: Sync Database Types to Consumer Repos
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'generated/database.types.ts'
+
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-to-product:
+    name: Sync to camperplaner-product
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout schema repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - name: Get schema commit info
+        id: schema-info
+        run: |
+          echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "commit_short=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "commit_url=https://github.com/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Checkout product repo
+        uses: actions/checkout@v4
+        with:
+          repository: it-guy92/camperplaner-product
+          token: ${{ secrets.SCHEMA_SYNC_TOKEN }}
+          path: product-repo
+          fetch-depth: 1
+
+      - name: Create sync branch
+        id: create-sync-branch
+        run: |
+          cd product-repo
+          TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+          BRANCH_NAME="schema-sync/${TIMESTAMP}"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Copy database types to product
+        run: |
+          cd product-repo
+          mkdir -p apps/web/src/lib
+          cp ../generated/database.types.ts apps/web/src/lib/database.types.ts
+          git add apps/web/src/lib/database.types.ts
+
+      - name: Commit and push changes
+        run: |
+          cd product-repo
+          git config user.name "schema-sync[bot]"
+          git config user.email "schema-sync@camperplaner.local"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "sync: update database.types from schema repo"
+          git push -u origin ${{ steps.create-sync-branch.outputs.branch_name }}
+
+      - name: Create PR in product repo
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ steps.create-sync-branch.outputs.branch_name }}';
+            const commitSha = '${{ steps.schema-info.outputs.commit_short }}';
+            const commitUrl = '${{ steps.schema-info.outputs.commit_url }}';
+
+            const pr = await github.rest.pulls.create({
+              owner: 'it-guy92',
+              repo: 'camperplaner-product',
+              title: `sync: update database.types from schema (${commitSha})`,
+              body: `## Schema Sync PR
+
+            This PR syncs the database types from the schema repository.
+
+            ### Source
+            - Schema commit: ${commitSha}
+            - Commit URL: ${commitUrl}
+            - File changed: \`generated/database.types.ts\`
+
+            ### Changes
+            - Updated \`apps/web/src/lib/database.types.ts\`
+
+            ### Verification Checklist
+            - [ ] Build passes (\`npm run build\`)
+            - [ ] TypeScript types valid (\`npx tsc --noEmit\`)
+            - [ ] Tests pass (\`npm run test\`)
+            - [ ] No manual changes needed
+
+            ### Auto-merge Instructions
+            To auto-merge this PR, run:
+            \`\`\`bash
+            gh pr merge --admin --repo it-guy92/camperplaner-product
+            \`\`\`
+            Or enable auto-merge in the GitHub UI.
+            `,
+              head: branchName,
+              base: 'main',
+              draft: false
+            });
+
+            console.log(`Created PR: ${pr.data.html_url}`);
+
+  sync-to-worker:
+    name: Sync to camperplaner-worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout schema repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - name: Get schema commit info
+        id: schema-info
+        run: |
+          echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "commit_short=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "commit_url=https://github.com/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Checkout worker repo
+        uses: actions/checkout@v4
+        with:
+          repository: it-guy92/camperplaner-worker
+          token: ${{ secrets.SCHEMA_SYNC_TOKEN }}
+          path: worker-repo
+          fetch-depth: 1
+
+      - name: Create sync branch
+        id: create-sync-branch
+        run: |
+          cd worker-repo
+          TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+          BRANCH_NAME="schema-sync/${TIMESTAMP}"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Copy database types to worker
+        run: |
+          cd worker-repo
+          mkdir -p src/types
+          cp ../generated/database.types.ts src/types/database.types.ts
+          git add src/types/database.types.ts
+
+      - name: Commit and push changes
+        run: |
+          cd worker-repo
+          git config user.name "schema-sync[bot]"
+          git config user.email "schema-sync@camperplaner.local"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "sync: update database.types from schema repo"
+          git push -u origin ${{ steps.create-sync-branch.outputs.branch_name }}
+
+      - name: Create PR in worker repo
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ steps.create-sync-branch.outputs.branch_name }}';
+            const commitSha = '${{ steps.schema-info.outputs.commit_short }}';
+            const commitUrl = '${{ steps.schema-info.outputs.commit_url }}';
+
+            const pr = await github.rest.pulls.create({
+              owner: 'it-guy92',
+              repo: 'camperplaner-worker',
+              title: `sync: update database.types from schema (${commitSha})`,
+              body: `## Schema Sync PR
+
+            This PR syncs the database types from the schema repository.
+
+            ### Source
+            - Schema commit: ${commitSha}
+            - Commit URL: ${commitUrl}
+            - File changed: \`generated/database.types.ts\`
+
+            ### Changes
+            - Updated \`src/types/database.types.ts\`
+
+            ### Verification Checklist
+            - [ ] Build passes (\`npm run build\`)
+            - [ ] TypeScript types valid (\`npx tsc --noEmit\`)
+            - [ ] Tests pass (\`npm run test\`)
+            - [ ] No manual changes needed
+
+            ### Auto-merge Instructions
+            To auto-merge this PR, run:
+            \`\`\`bash
+            gh pr merge --admin --repo it-guy92/camperplaner-worker
+            \`\`\`
+            Or enable auto-merge in the GitHub UI.
+            `,
+              head: branchName,
+              base: 'main',
+              draft: false
+            });
+
+            console.log(`Created PR: ${pr.data.html_url}`);
