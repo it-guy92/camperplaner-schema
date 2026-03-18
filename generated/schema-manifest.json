@@ -17,8 +17,8 @@
     }
   ],
   "migrations": {
-    "latest": "20260318235959",
-    "count": 29,
+    "latest": "20260318200000",
+    "count": 28,
     "pending_transfer": []
   },
   "contract_version": "1.0.0"
