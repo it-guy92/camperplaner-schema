@@ -2,7 +2,7 @@
 
 > **Location:** This is the canonical source of truth for the CamperPlaner database schema.
 > **Generated:** 2026-03-18
-> **Migration Head:** 20260318_fix_get_place_source_bundle_signature.sql
+> **Migration Head:** 20260318214500_backfill_missing_llm_property_rows.sql
 
 ---
 
@@ -10,11 +10,11 @@
 
 | Metric | Count |
 |--------|-------|
-| **Total Tables** | 45 |
-| **User Tables** | 38 |
+| **Total Tables** | 41 |
+| **User Tables** | 34 |
 | **System Tables** | 7 (PostGIS) |
 | **Views** | 6 |
-| **Enums** | 13 |
+| **Enums** | 20 |
 | **RPC Functions** | 1 |
 
 ---
@@ -72,41 +72,387 @@
 | `cutover_metric_snapshots` | Cutover performance metrics | `id` (bigint) |
 | `cutover_runtime_flags` | Cutover feature flags | `key` (text) |
 
-### 5. Phase 1: Enrichment Schema (NEW)
+### 5. Phase 1: Enrichment Schema (DEPRECATED - Tables Dropped)
 
-#### Parent Tables (Source Families)
+> ⚠️ **DROPPED** in migration `20260318213000_backfill_property_tables_and_drop_deprecated_fact_tables.sql`
 
-| Table | Description | Primary Key |
-|-------|-------------|-------------|
-| `place_llm_enrichments` | LLM output storage | `id` (bigint) |
-| `place_source_evidence_runs` | Evidence collection audit | `id` (bigint) |
-| `place_google_sources` | Google Places API cache | `id` (bigint) |
+The following tables have been **dropped** as part of the Phase 2 schema restructuring:
 
-#### Child Tables (LLM Enrichments)
+| Table | Status | Former Description |
+|-------|--------|-------------------|
+| `place_google_amenities` | **DROPPED** | Google amenities data |
+| `place_google_types` | **DROPPED** | Google place types |
+| `place_llm_facts` | **DROPPED** | Individual LLM-extracted facts |
+| `place_llm_sources` | **DROPPED** | Sources cited by LLM |
+| `place_llm_evidence_markers` | **DROPPED** | Trust markers for LLM output |
+| `place_source_evidence_runs` | **DROPPED** | Evidence collection audit |
+| `place_evidence_sources` | **DROPPED** | Individual fetched sources |
+| `place_evidence_markers` | **DROPPED** | Evidence markers from sources |
 
-| Table | Description | Primary Key | Parent |
-|-------|-------------|-------------|--------|
-| `place_llm_facts` | Individual LLM-extracted facts | `id` (bigint) | place_llm_enrichments |
-| `place_llm_sources` | Sources cited by LLM | `id` (bigint) | place_llm_enrichments |
-| `place_llm_evidence_markers` | Trust markers for LLM output | `id` (bigint) | place_llm_enrichments |
+**Migration that dropped these tables:** `20260318213000_backfill_property_tables_and_drop_deprecated_fact_tables.sql`
 
-#### Child Tables (Evidence Collection)
+### 6. Phase 2: Aligned Property Tables (NEW)
 
-| Table | Description | Primary Key | Parent |
-|-------|-------------|-------------|--------|
-| `place_evidence_sources` | Individual fetched sources | `id` (bigint) | place_source_evidence_runs |
-| `place_evidence_markers` | Evidence markers from sources | `id` (bigint) | place_source_evidence_runs |
+> ✨ **NEW** in migration `20260318200000_add_property_tables.sql`
 
-#### Child Tables (Google Sources)
+Aligned property tables provide a consistent schema for storing place properties from different sources (OSM, Google, LLM, User). Each table shares the same column structure for common fields and has source-specific columns.
 
-| Table | Description | Primary Key | Parent |
-|-------|-------------|-------------|--------|
-| `place_google_reviews` | Individual Google reviews | `id` (bigint) | place_google_sources |
-| `place_google_photos` | Google place photos | `id` (bigint) | place_google_sources |
-| `place_google_types` | Google place types | `id` (bigint) | place_google_sources |
-| `place_google_amenities` | Google amenities data | `id` (bigint) | place_google_sources |
+#### Shared Column Groups
 
-### 6. System/Cache Tables
+All four property tables share these column groups:
+
+| Group | Columns |
+|-------|---------|
+| **Infrastructure** | `id`, `place_id`, `is_current`, `created_at`, `updated_at`, `source_updated_at` |
+| **Identity/Content** | `name`, `description`, `place_type`, `source_place_type`, `source_categories` |
+| **Address/Location** | `country_code`, `region`, `city`, `postcode`, `address`, `source_lat`, `source_lon` |
+| **Contact/Operations** | `website`, `phone`, `email`, `opening_hours`, `fee_info` |
+| **Generic Flags** | `wheelchair_accessible`, `family_friendly`, `pets_allowed`, `indoor`, `outdoor`, `entry_fee_required`, `reservation_required`, `overnight_stay_allowed` |
+| **General Facilities** | `has_parking`, `has_restrooms`, `has_drinking_water`, `has_wifi`, `has_shop`, `has_restaurant`, `has_cafe` |
+| **Camping Permissions** | `caravan_allowed`, `motorhome_allowed`, `tent_allowed` |
+| **Camping Facilities** | `has_electricity`, `has_fresh_water`, `has_shower`, `has_laundry`, `has_dishwashing_area` |
+| **Disposal/Utilities** | `has_grey_water_disposal`, `has_black_water_disposal`, `has_chemical_toilet_disposal`, `has_dump_station`, `has_waste_disposal`, `has_recycling` |
+| **Leisure** | `has_bbq_area`, `has_fire_pit`, `has_playground`, `has_pool`, `has_beach` |
+| **Nudism** | `nudism_allowed`, `nudism_only` |
+| **Attraction/Museum** | `has_guided_tours`, `has_audio_guide`, `has_visitor_center`, `has_lockers`, `photography_allowed` |
+
+#### Property Tables
+
+| Table | Description | Primary Key | Source-Specific Columns |
+|-------|-------------|-------------|------------------------|
+| `place_osm_properties` | OSM property data | `id` (bigint) | `osm_source_id`, `osm_id`, `osm_type`, `osm_version`, `osm_timestamp` |
+| `place_google_properties` | Google Places property data | `id` (bigint) | `google_source_id`, `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at` |
+| `place_llm_properties` | LLM-enriched property data | `id` (bigint) | `llm_enrichment_id`, `provider`, `model`, `summary_de`, `trust_score`, `source_urls` |
+| `place_user_properties` | User-submitted property corrections | `id` (bigint) | `user_id` (uuid, NOT NULL) |
+
+#### `place_osm_properties`
+OSM property data with aligned schema.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigserial | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `is_current` | boolean | NOT NULL, DEFAULT true | Current/valid row flag |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() | Creation time |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() | Last update |
+| `source_updated_at` | timestamptz | NULL | Source data last update |
+| `name` | text | NULL | Place name |
+| `description` | text | NULL | Place description |
+| `place_type` | text | NULL | Normalized place type |
+| `source_place_type` | text | NULL | Original place type |
+| `source_categories` | text[] | NULL | Source categories |
+| `country_code` | text | NULL | ISO country code |
+| `region` | text | NULL | Region/state |
+| `city` | text | NULL | City name |
+| `postcode` | text | NULL | Postal code |
+| `address` | text | NULL | Full address |
+| `source_lat` | numeric | NULL | Source latitude |
+| `source_lon` | numeric | NULL | Source longitude |
+| `website` | text | NULL | Website URL |
+| `phone` | text | NULL | Phone number |
+| `email` | text | NULL | Email address |
+| `opening_hours` | text | NULL | Opening hours |
+| `fee_info` | text | NULL | Fee information |
+| `wheelchair_accessible` | boolean | NULL | Wheelchair accessible |
+| `family_friendly` | boolean | NULL | Family friendly |
+| `pets_allowed` | boolean | NULL | Pets allowed |
+| `indoor` | boolean | NULL | Indoor location |
+| `outdoor` | boolean | NULL | Outdoor location |
+| `entry_fee_required` | boolean | NULL | Entry fee required |
+| `reservation_required` | boolean | NULL | Reservation required |
+| `overnight_stay_allowed` | boolean | NULL | Overnight stay allowed |
+| `has_parking` | boolean | NULL | Has parking |
+| `has_restrooms` | boolean | NULL | Has restrooms |
+| `has_drinking_water` | boolean | NULL | Has drinking water |
+| `has_wifi` | boolean | NULL | Has WiFi |
+| `has_shop` | boolean | NULL | Has shop |
+| `has_restaurant` | boolean | NULL | Has restaurant |
+| `has_cafe` | boolean | NULL | Has cafe |
+| `caravan_allowed` | boolean | NULL | Caravan allowed |
+| `motorhome_allowed` | boolean | NULL | Motorhome allowed |
+| `tent_allowed` | boolean | NULL | Tent allowed |
+| `has_electricity` | boolean | NULL | Has electricity |
+| `has_fresh_water` | boolean | NULL | Has fresh water |
+| `has_shower` | boolean | NULL | Has shower |
+| `has_laundry` | boolean | NULL | Has laundry |
+| `has_dishwashing_area` | boolean | NULL | Has dishwashing area |
+| `has_grey_water_disposal` | boolean | NULL | Has grey water disposal |
+| `has_black_water_disposal` | boolean | NULL | Has black water disposal |
+| `has_chemical_toilet_disposal` | boolean | NULL | Has chemical toilet disposal |
+| `has_dump_station` | boolean | NULL | Has dump station |
+| `has_waste_disposal` | boolean | NULL | Has waste disposal |
+| `has_recycling` | boolean | NULL | Has recycling |
+| `has_bbq_area` | boolean | NULL | Has BBQ area |
+| `has_fire_pit` | boolean | NULL | Has fire pit |
+| `has_playground` | boolean | NULL | Has playground |
+| `has_pool` | boolean | NULL | Has pool |
+| `has_beach` | boolean | NULL | Has beach |
+| `nudism_allowed` | boolean | NULL | Nudism allowed |
+| `nudism_only` | boolean | NULL | Nudism only |
+| `has_guided_tours` | boolean | NULL | Has guided tours |
+| `has_audio_guide` | boolean | NULL | Has audio guide |
+| `has_visitor_center` | boolean | NULL | Has visitor center |
+| `has_lockers` | boolean | NULL | Has lockers |
+| `photography_allowed` | boolean | NULL | Photography allowed |
+| `osm_source_id` | bigint | NULL | FK to osm_source.id |
+| `osm_id` | bigint | NULL | OSM object ID |
+| `osm_type` | text | NULL | OSM object type (node/way/relation) |
+| `osm_version` | integer | NULL | OSM version number |
+| `osm_timestamp` | timestamptz | NULL | OSM last edit timestamp |
+
+**Indexes:**
+- `uidx_osm_properties_place_current` (partial, unique) ON `(place_id)` WHERE `is_current = true`
+- `idx_osm_properties_place_id` ON `(place_id)`
+- `idx_osm_properties_is_current` ON `(is_current)` WHERE `is_current = true`
+- `idx_osm_properties_osm_id` ON `(osm_id)` WHERE `osm_id IS NOT NULL`
+- `idx_osm_properties_place_current` ON `(place_id, is_current)` WHERE `is_current = true`
+
+#### `place_google_properties`
+Google Places property data with aligned schema.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigserial | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `is_current` | boolean | NOT NULL, DEFAULT true | Current/valid row flag |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() | Creation time |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() | Last update |
+| `source_updated_at` | timestamptz | NULL | Source data last update |
+| `name` | text | NULL | Place name |
+| `description` | text | NULL | Place description |
+| `place_type` | text | NULL | Normalized place type |
+| `source_place_type` | text | NULL | Original place type |
+| `source_categories` | text[] | NULL | Source categories |
+| `country_code` | text | NULL | ISO country code |
+| `region` | text | NULL | Region/state |
+| `city` | text | NULL | City name |
+| `postcode` | text | NULL | Postal code |
+| `address` | text | NULL | Full address |
+| `source_lat` | numeric | NULL | Source latitude |
+| `source_lon` | numeric | NULL | Source longitude |
+| `website` | text | NULL | Website URL |
+| `phone` | text | NULL | Phone number |
+| `email` | text | NULL | Email address |
+| `opening_hours` | text | NULL | Opening hours |
+| `fee_info` | text | NULL | Fee information |
+| `wheelchair_accessible` | boolean | NULL | Wheelchair accessible |
+| `family_friendly` | boolean | NULL | Family friendly |
+| `pets_allowed` | boolean | NULL | Pets allowed |
+| `indoor` | boolean | NULL | Indoor location |
+| `outdoor` | boolean | NULL | Outdoor location |
+| `entry_fee_required` | boolean | NULL | Entry fee required |
+| `reservation_required` | boolean | NULL | Reservation required |
+| `overnight_stay_allowed` | boolean | NULL | Overnight stay allowed |
+| `has_parking` | boolean | NULL | Has parking |
+| `has_restrooms` | boolean | NULL | Has restrooms |
+| `has_drinking_water` | boolean | NULL | Has drinking water |
+| `has_wifi` | boolean | NULL | Has WiFi |
+| `has_shop` | boolean | NULL | Has shop |
+| `has_restaurant` | boolean | NULL | Has restaurant |
+| `has_cafe` | boolean | NULL | Has cafe |
+| `caravan_allowed` | boolean | NULL | Caravan allowed |
+| `motorhome_allowed` | boolean | NULL | Motorhome allowed |
+| `tent_allowed` | boolean | NULL | Tent allowed |
+| `has_electricity` | boolean | NULL | Has electricity |
+| `has_fresh_water` | boolean | NULL | Has fresh water |
+| `has_shower` | boolean | NULL | Has shower |
+| `has_laundry` | boolean | NULL | Has laundry |
+| `has_dishwashing_area` | boolean | NULL | Has dishwashing area |
+| `has_grey_water_disposal` | boolean | NULL | Has grey water disposal |
+| `has_black_water_disposal` | boolean | NULL | Has black water disposal |
+| `has_chemical_toilet_disposal` | boolean | NULL | Has chemical toilet disposal |
+| `has_dump_station` | boolean | NULL | Has dump station |
+| `has_waste_disposal` | boolean | NULL | Has waste disposal |
+| `has_recycling` | boolean | NULL | Has recycling |
+| `has_bbq_area` | boolean | NULL | Has BBQ area |
+| `has_fire_pit` | boolean | NULL | Has fire pit |
+| `has_playground` | boolean | NULL | Has playground |
+| `has_pool` | boolean | NULL | Has pool |
+| `has_beach` | boolean | NULL | Has beach |
+| `nudism_allowed` | boolean | NULL | Nudism allowed |
+| `nudism_only` | boolean | NULL | Nudism only |
+| `has_guided_tours` | boolean | NULL | Has guided tours |
+| `has_audio_guide` | boolean | NULL | Has audio guide |
+| `has_visitor_center` | boolean | NULL | Has visitor center |
+| `has_lockers` | boolean | NULL | Has lockers |
+| `photography_allowed` | boolean | NULL | Photography allowed |
+| `google_source_id` | bigint | NULL | FK to place_google_sources.id |
+| `google_place_id` | text | NULL | Google Places API ID |
+| `rating` | numeric | NULL | Google rating (0-5) |
+| `review_count` | integer | NULL | Number of Google reviews |
+| `business_status` | text | NULL | Business status enum |
+| `expires_at` | timestamptz | NULL | Cache expiration time |
+
+**Indexes:**
+- `uidx_google_properties_place_current` (partial, unique) ON `(place_id)` WHERE `is_current = true`
+- `idx_google_properties_place_id` ON `(place_id)`
+- `idx_google_properties_is_current` ON `(is_current)` WHERE `is_current = true`
+- `idx_google_properties_google_place_id` ON `(google_place_id)` WHERE `google_place_id IS NOT NULL`
+- `idx_google_properties_expires` ON `(expires_at)` WHERE `expires_at IS NOT NULL`
+- `idx_google_properties_place_current` ON `(place_id, is_current)` WHERE `is_current = true`
+
+#### `place_llm_properties`
+LLM-enriched property data with aligned schema.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigserial | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `is_current` | boolean | NOT NULL, DEFAULT true | Current/valid row flag |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() | Creation time |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() | Last update |
+| `source_updated_at` | timestamptz | NULL | Source data last update |
+| `name` | text | NULL | Place name |
+| `description` | text | NULL | Place description |
+| `place_type` | text | NULL | Normalized place type |
+| `source_place_type` | text | NULL | Original place type |
+| `source_categories` | text[] | NULL | Source categories |
+| `country_code` | text | NULL | ISO country code |
+| `region` | text | NULL | Region/state |
+| `city` | text | NULL | City name |
+| `postcode` | text | NULL | Postal code |
+| `address` | text | NULL | Full address |
+| `source_lat` | numeric | NULL | Source latitude |
+| `source_lon` | numeric | NULL | Source longitude |
+| `website` | text | NULL | Website URL |
+| `phone` | text | NULL | Phone number |
+| `email` | text | NULL | Email address |
+| `opening_hours` | text | NULL | Opening hours |
+| `fee_info` | text | NULL | Fee information |
+| `wheelchair_accessible` | boolean | NULL | Wheelchair accessible |
+| `family_friendly` | boolean | NULL | Family friendly |
+| `pets_allowed` | boolean | NULL | Pets allowed |
+| `indoor` | boolean | NULL | Indoor location |
+| `outdoor` | boolean | NULL | Outdoor location |
+| `entry_fee_required` | boolean | NULL | Entry fee required |
+| `reservation_required` | boolean | NULL | Reservation required |
+| `overnight_stay_allowed` | boolean | NULL | Overnight stay allowed |
+| `has_parking` | boolean | NULL | Has parking |
+| `has_restrooms` | boolean | NULL | Has restrooms |
+| `has_drinking_water` | boolean | NULL | Has drinking water |
+| `has_wifi` | boolean | NULL | Has WiFi |
+| `has_shop` | boolean | NULL | Has shop |
+| `has_restaurant` | boolean | NULL | Has restaurant |
+| `has_cafe` | boolean | NULL | Has cafe |
+| `caravan_allowed` | boolean | NULL | Caravan allowed |
+| `motorhome_allowed` | boolean | NULL | Motorhome allowed |
+| `tent_allowed` | boolean | NULL | Tent allowed |
+| `has_electricity` | boolean | NULL | Has electricity |
+| `has_fresh_water` | boolean | NULL | Has fresh water |
+| `has_shower` | boolean | NULL | Has shower |
+| `has_laundry` | boolean | NULL | Has laundry |
+| `has_dishwashing_area` | boolean | NULL | Has dishwashing area |
+| `has_grey_water_disposal` | boolean | NULL | Has grey water disposal |
+| `has_black_water_disposal` | boolean | NULL | Has black water disposal |
+| `has_chemical_toilet_disposal` | boolean | NULL | Has chemical toilet disposal |
+| `has_dump_station` | boolean | NULL | Has dump station |
+| `has_waste_disposal` | boolean | NULL | Has waste disposal |
+| `has_recycling` | boolean | NULL | Has recycling |
+| `has_bbq_area` | boolean | NULL | Has BBQ area |
+| `has_fire_pit` | boolean | NULL | Has fire pit |
+| `has_playground` | boolean | NULL | Has playground |
+| `has_pool` | boolean | NULL | Has pool |
+| `has_beach` | boolean | NULL | Has beach |
+| `nudism_allowed` | boolean | NULL | Nudism allowed |
+| `nudism_only` | boolean | NULL | Nudism only |
+| `has_guided_tours` | boolean | NULL | Has guided tours |
+| `has_audio_guide` | boolean | NULL | Has audio guide |
+| `has_visitor_center` | boolean | NULL | Has visitor center |
+| `has_lockers` | boolean | NULL | Has lockers |
+| `photography_allowed` | boolean | NULL | Photography allowed |
+| `llm_enrichment_id` | bigint | NULL | FK to place_llm_enrichments.id |
+| `provider` | text | NULL | LLM provider (openai/anthropic) |
+| `model` | text | NULL | Model identifier |
+| `summary_de` | text | NULL | German-language summary |
+| `trust_score` | numeric | NULL | Trust score (0-1) |
+| `source_urls` | jsonb | NULL | Array of source URLs |
+
+**Indexes:**
+- `uidx_llm_properties_place_current` (partial, unique) ON `(place_id)` WHERE `is_current = true`
+- `idx_llm_properties_place_id` ON `(place_id)`
+- `idx_llm_properties_is_current` ON `(is_current)` WHERE `is_current = true`
+- `idx_llm_properties_provider` ON `(provider)` WHERE `provider IS NOT NULL`
+- `idx_llm_properties_place_current` ON `(place_id, is_current)` WHERE `is_current = true`
+
+#### `place_user_properties`
+User-submitted property corrections with aligned schema.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | bigserial | PK, NOT NULL | Unique identifier |
+| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
+| `is_current` | boolean | NOT NULL, DEFAULT true | Current/valid row flag |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() | Creation time |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() | Last update |
+| `source_updated_at` | timestamptz | NULL | Source data last update |
+| `name` | text | NULL | Place name |
+| `description` | text | NULL | Place description |
+| `place_type` | text | NULL | Normalized place type |
+| `source_place_type` | text | NULL | Original place type |
+| `source_categories` | text[] | NULL | Source categories |
+| `country_code` | text | NULL | ISO country code |
+| `region` | text | NULL | Region/state |
+| `city` | text | NULL | City name |
+| `postcode` | text | NULL | Postal code |
+| `address` | text | NULL | Full address |
+| `source_lat` | numeric | NULL | Source latitude |
+| `source_lon` | numeric | NULL | Source longitude |
+| `website` | text | NULL | Website URL |
+| `phone` | text | NULL | Phone number |
+| `email` | text | NULL | Email address |
+| `opening_hours` | text | NULL | Opening hours |
+| `fee_info` | text | NULL | Fee information |
+| `wheelchair_accessible` | boolean | NULL | Wheelchair accessible |
+| `family_friendly` | boolean | NULL | Family friendly |
+| `pets_allowed` | boolean | NULL | Pets allowed |
+| `indoor` | boolean | NULL | Indoor location |
+| `outdoor` | boolean | NULL | Outdoor location |
+| `entry_fee_required` | boolean | NULL | Entry fee required |
+| `reservation_required` | boolean | NULL | Reservation required |
+| `overnight_stay_allowed` | boolean | NULL | Overnight stay allowed |
+| `has_parking` | boolean | NULL | Has parking |
+| `has_restrooms` | boolean | NULL | Has restrooms |
+| `has_drinking_water` | boolean | NULL | Has drinking water |
+| `has_wifi` | boolean | NULL | Has WiFi |
+| `has_shop` | boolean | NULL | Has shop |
+| `has_restaurant` | boolean | NULL | Has restaurant |
+| `has_cafe` | boolean | NULL | Has cafe |
+| `caravan_allowed` | boolean | NULL | Caravan allowed |
+| `motorhome_allowed` | boolean | NULL | Motorhome allowed |
+| `tent_allowed` | boolean | NULL | Tent allowed |
+| `has_electricity` | boolean | NULL | Has electricity |
+| `has_fresh_water` | boolean | NULL | Has fresh water |
+| `has_shower` | boolean | NULL | Has shower |
+| `has_laundry` | boolean | NULL | Has laundry |
+| `has_dishwashing_area` | boolean | NULL | Has dishwashing area |
+| `has_grey_water_disposal` | boolean | NULL | Has grey water disposal |
+| `has_black_water_disposal` | boolean | NULL | Has black water disposal |
+| `has_chemical_toilet_disposal` | boolean | NULL | Has chemical toilet disposal |
+| `has_dump_station` | boolean | NULL | Has dump station |
+| `has_waste_disposal` | boolean | NULL | Has waste disposal |
+| `has_recycling` | boolean | NULL | Has recycling |
+| `has_bbq_area` | boolean | NULL | Has BBQ area |
+| `has_fire_pit` | boolean | NULL | Has fire pit |
+| `has_playground` | boolean | NULL | Has playground |
+| `has_pool` | boolean | NULL | Has pool |
+| `has_beach` | boolean | NULL | Has beach |
+| `nudism_allowed` | boolean | NULL | Nudism allowed |
+| `nudism_only` | boolean | NULL | Nudism only |
+| `has_guided_tours` | boolean | NULL | Has guided tours |
+| `has_audio_guide` | boolean | NULL | Has audio guide |
+| `has_visitor_center` | boolean | NULL | Has visitor center |
+| `has_lockers` | boolean | NULL | Has lockers |
+| `photography_allowed` | boolean | NULL | Photography allowed |
+| `user_id` | uuid | NOT NULL | User who submitted correction |
+
+**Indexes:**
+- `uidx_user_properties_place_user_current` (partial, unique) ON `(place_id, user_id)` WHERE `is_current = true`
+- `idx_user_properties_place_id` ON `(place_id)`
+- `idx_user_properties_user_id` ON `(user_id)`
+- `idx_user_properties_user_current` ON `(user_id, is_current)` WHERE `is_current = true`
+- `idx_user_properties_place_user_current` ON `(place_id, user_id, is_current)` WHERE `is_current = true`
+
+### 7. System/Cache Tables
 
 | Table | Description | Primary Key |
 |-------|-------------|-------------|
@@ -229,6 +575,8 @@ User saved favorites.
 
 #### `places`
 Main places table with canonical data.
+
+> **Note:** This table still contains all business columns (has_toilet, has_shower, has_electricity, has_water, has_wifi, pet_friendly, caravan_allowed, motorhome_allowed, tent_allowed, website, phone, email, opening_hours, fee_info, source_primary, data_confidence, etc.). Column trimming to align with the new property table structure is planned for a future migration.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -413,104 +761,6 @@ LLM output storage (parent table).
 | `updated_at` | timestamptz | NOT NULL | Update time |
 | `created_by` | text | NULL | Creator reference |
 
-#### `place_llm_facts`
-Individual LLM-extracted facts.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `llm_enrichment_id` | bigint | FK → place_llm_enrichments.id, NOT NULL | Parent enrichment |
-| `field_name` | text | NOT NULL | Field name |
-| `value_text` | text | NULL | Value as text |
-| `value_type` | text | NOT NULL | Value type |
-| `confidence` | numeric | NULL | Confidence score |
-| `provenance_kind` | text | NULL | Provenance type |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-| `updated_at` | timestamptz | NOT NULL | Update time |
-
-#### `place_llm_sources`
-Sources cited by LLM.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `llm_enrichment_id` | bigint | FK → place_llm_enrichments.id, NOT NULL | Parent enrichment |
-| `source_url` | text | NOT NULL | Source URL |
-| `source_domain` | text | NULL | Domain |
-| `source_kind` | text | NOT NULL | Source type |
-| `trusted` | boolean | NULL | Trusted flag |
-| `relevance_score` | numeric | NULL | Relevance (0-1) |
-| `fetched_at` | timestamptz | NULL | Fetch time |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-
-#### `place_llm_evidence_markers`
-Trust markers for LLM output.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `llm_enrichment_id` | bigint | FK → place_llm_enrichments.id, NOT NULL | Parent enrichment |
-| `field_name` | text | NOT NULL | Field name |
-| `marker_text` | text | NOT NULL | Marker text |
-| `marker_type` | text | NOT NULL | Marker type |
-| `confidence` | numeric | NULL | Confidence |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-
-### Evidence Collection Tables
-
-#### `place_source_evidence_runs`
-Evidence collection audit.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `place_id` | bigint | FK → places.id, NOT NULL | Parent place |
-| `job_id` | bigint | FK → enrichment_jobs.id, NULL | Job reference |
-| `worker_id` | text | NULL | Worker ID |
-| `attempt_number` | integer | NOT NULL | Attempt count |
-| `collection_status` | text | NOT NULL | Collection status |
-| `source_urls` | jsonb | NULL | Source URLs array |
-| `source_evidence` | jsonb | NULL | Scraped content |
-| `evidence_markers` | jsonb | NULL | Evidence markers |
-| `trusted_source_count` | integer | NULL | Trusted source count |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-| `updated_at` | timestamptz | NOT NULL | Update time |
-
-#### `place_evidence_sources`
-Individual fetched sources.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `evidence_run_id` | bigint | FK → place_source_evidence_runs.id, NOT NULL | Parent run |
-| `source_url` | text | NOT NULL | URL fetched |
-| `source_domain` | text | NULL | Domain |
-| `fetch_status` | text | NOT NULL | Fetch status |
-| `http_status` | integer | NULL | HTTP response code |
-| `trusted` | boolean | NULL | Trusted flag |
-| `content_type` | text | NULL | Content type |
-| `fetched_at` | timestamptz | NULL | Fetch time |
-| `content_length` | integer | NULL | Content length |
-| `error_message` | text | NULL | Error message |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-| `updated_at` | timestamptz | NOT NULL | Update time |
-
-#### `place_evidence_markers`
-Evidence markers from sources.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `evidence_run_id` | bigint | FK → place_source_evidence_runs.id, NOT NULL | Parent run |
-| `field_name` | text | NOT NULL | Field name |
-| `marker_text` | text | NOT NULL | Marker text |
-| `marker_type` | text | NOT NULL | Marker type |
-| `confidence` | numeric | NULL | Confidence |
-| `source_url` | text | NULL | Source URL |
-| `context_before` | text | NULL | Context before |
-| `context_after` | text | NULL | Context after |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-
 ### Google Sources Tables
 
 #### `place_google_sources`
@@ -566,36 +816,6 @@ Google place photos.
 | `attribution` | text | NULL | Attribution text |
 | `google_photo_id` | text | NULL | Google photo ID |
 | `created_at` | timestamptz | NOT NULL | Creation time |
-
-#### `place_google_types`
-Google place types.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
-| `google_type` | text | NOT NULL | Google type |
-| `is_primary` | boolean | NOT NULL | Primary flag |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-
-#### `place_google_amenities`
-Google amenities data.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | bigint | PK, NOT NULL | Unique identifier |
-| `google_source_id` | bigint | FK → place_google_sources.id, NOT NULL | Parent source |
-| `amenity_key` | text | NOT NULL | Amenity key |
-| `value_text` | text | NULL | Text value |
-| `value_boolean` | boolean | NULL | Boolean value |
-| `value_numeric` | numeric | NULL | Numeric value |
-| `value_type` | text | NOT NULL | Value type enum |
-| `google_feature_type` | text | NULL | Feature type |
-| `is_verified` | boolean | NOT NULL | Verified flag |
-| `confidence_score` | numeric | NULL | Confidence |
-| `source_section` | text | NULL | Source section |
-| `created_at` | timestamptz | NOT NULL | Creation time |
-| `updated_at` | timestamptz | NOT NULL | Update time |
 
 ### Queue & Import Tables
 
@@ -914,8 +1134,11 @@ places (id)
   ├── osm_source (place_id)
   ├── place_enrichment (place_id)
   ├── place_llm_enrichments (place_id)
-  ├── place_source_evidence_runs (place_id)
   ├── place_google_sources (place_id)
+  ├── place_osm_properties (place_id)
+  ├── place_google_properties (place_id)
+  ├── place_llm_properties (place_id)
+  ├── place_user_properties (place_id)
   └── enrichment_jobs (place_id)
 ```
 
@@ -923,23 +1146,28 @@ places (id)
 
 ```
 enrichment_jobs (id)
-  ├── place_llm_enrichments (job_id)
-  └── place_source_evidence_runs (job_id)
+  └── place_llm_enrichments (job_id)
 
 place_llm_enrichments (id)
-  ├── place_llm_facts (llm_enrichment_id)
-  ├── place_llm_sources (llm_enrichment_id)
-  └── place_llm_evidence_markers (llm_enrichment_id)
-
-place_source_evidence_runs (id)
-  ├── place_evidence_sources (evidence_run_id)
-  └── place_evidence_markers (evidence_run_id)
+  └── place_llm_properties (llm_enrichment_id)
 
 place_google_sources (id)
   ├── place_google_reviews (google_source_id)
   ├── place_google_photos (google_source_id)
-  ├── place_google_types (google_source_id)
-  └── place_google_amenities (google_source_id)
+  └── place_google_properties (google_source_id)
+```
+
+### Property Table Relationships
+
+```
+places (id)
+  ├── place_osm_properties (place_id)
+  ├── place_google_properties (place_id)
+  ├── place_llm_properties (place_id)
+  └── place_user_properties (place_id, user_id)
+
+osm_source (id)
+  └── place_osm_properties (osm_source_id)
 ```
 
 ---
@@ -971,21 +1199,72 @@ JSONB columns are allowed ONLY for specific use cases:
 | Vendor-specific details | `place_google_sources.raw_payload` |
 | Debug metadata | `provider_attempts`, `metadata` |
 | Unprocessed source data | `osm_source.tags` |
+| Source URLs array | `place_llm_properties.source_urls` |
 
-### Source Family Pattern
-New enrichment schema uses "source families" - parent tables that group related data:
+### Aligned Property Table Pattern
+New Phase 2 schema uses "aligned property tables" - a set of four tables with identical column structures for common fields and source-specific columns:
 
-1. **LLM Family** (`place_llm_enrichments`)
-   - Parent: place_llm_enrichments
-   - Children: place_llm_facts, place_llm_sources, place_llm_evidence_markers
+1. **OSM Family** (`place_osm_properties`)
+   - Shared columns: 62 columns covering identity, location, contact, facilities, amenities
+   - Source-specific: `osm_source_id`, `osm_id`, `osm_type`, `osm_version`, `osm_timestamp`
 
-2. **Evidence Family** (`place_source_evidence_runs`)
-   - Parent: place_source_evidence_runs
-   - Children: place_evidence_sources, place_evidence_markers
+2. **Google Family** (`place_google_properties`)
+   - Shared columns: 62 columns (same as OSM)
+   - Source-specific: `google_source_id`, `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at`
 
-3. **Google Family** (`place_google_sources`)
-   - Parent: place_google_sources
-   - Children: place_google_reviews, place_google_photos, place_google_types, place_google_amenities
+3. **LLM Family** (`place_llm_properties`)
+   - Shared columns: 62 columns (same as OSM)
+   - Source-specific: `llm_enrichment_id`, `provider`, `model`, `summary_de`, `trust_score`, `source_urls`
+
+4. **User Family** (`place_user_properties`)
+   - Shared columns: 62 columns (same as OSM)
+   - Source-specific: `user_id` (uuid, NOT NULL)
+
+### Current-Row Semantics
+Each property table enforces exactly one current row per place (or per place+user for user properties) using partial unique indexes:
+
+```sql
+CREATE UNIQUE INDEX uidx_osm_properties_place_current
+    ON place_osm_properties(place_id)
+    WHERE is_current = true;
+```
+
+---
+
+## Migration History
+
+| Migration | Date | Description |
+|-----------|------|-------------|
+| `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 21:45 | Backfill missing historical rows from place_llm_enrichments into place_llm_properties |
+| `20260318213000_backfill_property_tables_and_drop_deprecated_fact_tables.sql` | 2026-03-18 21:30 | Backfill aligned property tables from existing source data; DROP 8 deprecated tables (place_google_amenities, place_google_types, place_llm_facts, place_llm_sources, place_llm_evidence_markers, place_source_evidence_runs, place_evidence_sources, place_evidence_markers) |
+| `20260318200000_add_property_tables.sql` | 2026-03-18 20:00 | Add Phase 2 aligned property tables (place_osm_properties, place_google_properties, place_llm_properties, place_user_properties) with shared columns, source-specific columns, current-row semantics, and proper indexes |
+| `20260318130000_fix_get_place_source_bundle_ambiguous.sql` | 2026-03-18 13:00 | Fix ambiguous column issue in get_place_source_bundle RPC |
+| `20260317210003_source_family_constraints.sql` | 2026-03-17 21:00 | Add constraints to source family tables |
+| `20260317210001_google_refresh_lease.sql` | 2026-03-17 21:00 | Add google_refresh_claims table |
+| `20260317210002_source_bundle_rpc.sql` | 2026-03-17 21:00 | Add get_place_source_bundle RPC function |
+| `20260316140001_fix_place_id_ambiguity.sql` | 2026-03-16 14:00 | Fix place_id ambiguity in enrichment_jobs |
+| `20260316130001_simplify_get_place_enrichment_status.sql` | 2026-03-16 13:00 | Simplify get_place_enrichment_status function |
+| `20260316120001_fix_get_place_enrichment_status.sql` | 2026-03-16 12:00 | Fix get_place_enrichment_status function |
+| `20260316110004_enrichment_jobs_typed_columns.sql` | 2026-03-16 11:00 | Add typed columns to enrichment_jobs |
+| `20260316110003_enrichment_jobs_rpc_update.sql` | 2026-03-16 11:00 | Update enrichment_jobs RPC |
+| `20260316110002_add_source_family_tables.sql` | 2026-03-16 11:00 | Add source family tables (Phase 1) |
+| `20260316110001_add_get_place_enrichment_status.sql` | 2026-03-16 11:00 | Add get_place_enrichment_status function |
+| `20260316000001_add_google_amenities_table.sql` | 2026-03-16 00:00 | Add google amenities table |
+| `20260314221355_fix_campsite_full_required_fields_and_amenities.sql` | 2026-03-14 22:13 | Fix campsite_full view |
+| `20260314000012_extend_campsite_full_view_amenities.sql` | 2026-03-14 00:12 | Extend campsite_full view amenities |
+| `20260314000011_drop_decommissioned_legacy_tables.sql` | 2026-03-14 00:11 | Drop decommissioned legacy tables |
+| `20260317000001_fix_enrichment_jobs_types.sql` | 2026-03-17 00:00 | Fix enrichment_jobs types |
+| `20260310000010_migrate_campsites_data.sql` | 2026-03-10 00:10 | Migrate campsites data |
+| `20260310000009_create_composite_indexes.sql` | 2026-03-10 00:09 | Create composite indexes |
+| `20260310000008_create_google_cleanup_job.sql` | 2026-03-10 00:08 | Create google cleanup job |
+| `20260310000007_create_campsite_full_view.sql` | 2026-03-10 00:07 | Create campsite_full view |
+| `20260310000006_refactor_campsites_cache.sql` | 2026-03-10 00:06 | Refactor campsites_cache |
+| `20260310000005_create_campsites_table.sql` | 2026-03-10 00:05 | Create campsites table |
+| `20260310000004_migrate_to_postgis.sql` | 2026-03-10 00:04 | Migrate to PostGIS |
+| `20260310000003_create_enum_types.sql` | 2026-03-10 00:03 | Create enum types |
+| `20260310000002_add_google_ttl_columns.sql` | 2026-03-10 00:02 | Add Google TTL columns |
+| `20260310000001_fix_campsite_prices_fk.sql` | 2026-03-10 00:01 | Fix campsite_prices foreign key |
+| `20260310000000_baseline_schema.sql` | 2026-03-10 00:00 | Baseline schema |
 
 ---
 
@@ -1001,3 +1280,5 @@ New enrichment schema uses "source families" - parent tables that group related 
 - `docs/database-access-audit.md` - Full access audit
 - `docs/worker-schema-migration-guide.md` - Worker migration guide
 - `docs/SCHEMA_WORKFLOW.md` - Schema workflow documentation
+
+(End of file - total 1567 lines)

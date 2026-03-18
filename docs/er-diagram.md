@@ -2,7 +2,7 @@
 
 > **Schema Repository:** Canonical source of truth
 > **Generated:** 2026-03-18
-> **Migration Head:** 20260318_fix_get_place_source_bundle_signature.sql
+> **Migration Head:** 20260318214500_backfill_missing_llm_property_rows.sql
 
 ---
 
@@ -141,6 +141,288 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+    
+    %% ----------------------------------------------------------
+    %% PLACE PROPERTIES TABLES (OSM, Google, LLM, User)
+    %% ----------------------------------------------------------
+    
+    place_osm_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz source_updated_at
+        string name
+        string place_type
+        string source_place_type
+        jsonb source_categories
+        string country_code
+        string region
+        string city
+        string postcode
+        string address
+        string website
+        string phone
+        string email
+        string opening_hours
+        string fee_info
+        boolean wheelchair_accessible
+        boolean family_friendly
+        boolean pets_allowed
+        boolean indoor
+        boolean outdoor
+        boolean entry_fee_required
+        boolean reservation_required
+        boolean overnight_stay_allowed
+        boolean has_parking
+        boolean has_restrooms
+        boolean has_drinking_water
+        boolean has_wifi
+        boolean has_shop
+        boolean has_restaurant
+        boolean has_cafe
+        boolean caravan_allowed
+        boolean motorhome_allowed
+        boolean tent_allowed
+        boolean has_electricity
+        boolean has_fresh_water
+        boolean has_shower
+        boolean has_laundry
+        boolean has_dishwashing_area
+        boolean has_grey_water_disposal
+        boolean has_black_water_disposal
+        boolean has_chemical_toilet_disposal
+        boolean has_dump_station
+        boolean has_waste_disposal
+        boolean has_recycling
+        boolean has_bbq_area
+        boolean has_fire_pit
+        boolean has_playground
+        boolean has_pool
+        boolean has_beach
+        boolean nudism_allowed
+        boolean nudism_only
+        boolean has_guided_tours
+        boolean has_audio_guide
+        boolean has_visitor_center
+        boolean has_lockers
+        boolean photography_allowed
+        bigint osm_source_id
+        bigint osm_id
+        string osm_type
+        integer osm_version
+        timestamptz osm_timestamp
+    }
+    
+    place_google_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz source_updated_at
+        string name
+        string place_type
+        string source_place_type
+        jsonb source_categories
+        string country_code
+        string region
+        string city
+        string postcode
+        string address
+        string website
+        string phone
+        string email
+        string opening_hours
+        string fee_info
+        boolean wheelchair_accessible
+        boolean family_friendly
+        boolean pets_allowed
+        boolean indoor
+        boolean outdoor
+        boolean entry_fee_required
+        boolean reservation_required
+        boolean overnight_stay_allowed
+        boolean has_parking
+        boolean has_restrooms
+        boolean has_drinking_water
+        boolean has_wifi
+        boolean has_shop
+        boolean has_restaurant
+        boolean has_cafe
+        boolean caravan_allowed
+        boolean motorhome_allowed
+        boolean tent_allowed
+        boolean has_electricity
+        boolean has_fresh_water
+        boolean has_shower
+        boolean has_laundry
+        boolean has_dishwashing_area
+        boolean has_grey_water_disposal
+        boolean has_black_water_disposal
+        boolean has_chemical_toilet_disposal
+        boolean has_dump_station
+        boolean has_waste_disposal
+        boolean has_recycling
+        boolean has_bbq_area
+        boolean has_fire_pit
+        boolean has_playground
+        boolean has_pool
+        boolean has_beach
+        boolean nudism_allowed
+        boolean nudism_only
+        boolean has_guided_tours
+        boolean has_audio_guide
+        boolean has_visitor_center
+        boolean has_lockers
+        boolean photography_allowed
+        bigint google_source_id
+        string google_place_id
+        numeric rating
+        integer review_count
+        string business_status
+        timestamptz expires_at
+    }
+    
+    place_llm_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz source_updated_at
+        string name
+        string place_type
+        string source_place_type
+        jsonb source_categories
+        string country_code
+        string region
+        string city
+        string postcode
+        string address
+        string website
+        string phone
+        string email
+        string opening_hours
+        string fee_info
+        boolean wheelchair_accessible
+        boolean family_friendly
+        boolean pets_allowed
+        boolean indoor
+        boolean outdoor
+        boolean entry_fee_required
+        boolean reservation_required
+        boolean overnight_stay_allowed
+        boolean has_parking
+        boolean has_restrooms
+        boolean has_drinking_water
+        boolean has_wifi
+        boolean has_shop
+        boolean has_restaurant
+        boolean has_cafe
+        boolean caravan_allowed
+        boolean motorhome_allowed
+        boolean tent_allowed
+        boolean has_electricity
+        boolean has_fresh_water
+        boolean has_shower
+        boolean has_laundry
+        boolean has_dishwashing_area
+        boolean has_grey_water_disposal
+        boolean has_black_water_disposal
+        boolean has_chemical_toilet_disposal
+        boolean has_dump_station
+        boolean has_waste_disposal
+        boolean has_recycling
+        boolean has_bbq_area
+        boolean has_fire_pit
+        boolean has_playground
+        boolean has_pool
+        boolean has_beach
+        boolean nudism_allowed
+        boolean nudism_only
+        boolean has_guided_tours
+        boolean has_audio_guide
+        boolean has_visitor_center
+        boolean has_lockers
+        boolean photography_allowed
+        bigint llm_enrichment_id
+        string provider
+        string model
+        string summary_de
+        numeric trust_score
+        jsonb source_urls
+    }
+    
+    place_user_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz source_updated_at
+        string name
+        string place_type
+        string source_place_type
+        jsonb source_categories
+        string country_code
+        string region
+        string city
+        string postcode
+        string address
+        string website
+        string phone
+        string email
+        string opening_hours
+        string fee_info
+        boolean wheelchair_accessible
+        boolean family_friendly
+        boolean pets_allowed
+        boolean indoor
+        boolean outdoor
+        boolean entry_fee_required
+        boolean reservation_required
+        boolean overnight_stay_allowed
+        boolean has_parking
+        boolean has_restrooms
+        boolean has_drinking_water
+        boolean has_wifi
+        boolean has_shop
+        boolean has_restaurant
+        boolean has_cafe
+        boolean caravan_allowed
+        boolean motorhome_allowed
+        boolean tent_allowed
+        boolean has_electricity
+        boolean has_fresh_water
+        boolean has_shower
+        boolean has_laundry
+        boolean has_dishwashing_area
+        boolean has_grey_water_disposal
+        boolean has_black_water_disposal
+        boolean has_chemical_toilet_disposal
+        boolean has_dump_station
+        boolean has_waste_disposal
+        boolean has_recycling
+        boolean has_bbq_area
+        boolean has_fire_pit
+        boolean has_playground
+        boolean has_pool
+        boolean has_beach
+        boolean nudism_allowed
+        boolean nudism_only
+        boolean has_guided_tours
+        boolean has_audio_guide
+        boolean has_visitor_center
+        boolean has_lockers
+        boolean photography_allowed
+        uuid user_id
+    }
+    
+    %% ----------------------------------------------------------
+    %% LEGACY SOURCE TABLES (Remaining)
+    %% ----------------------------------------------------------
     
     osm_source {
         bigint id PK
@@ -346,90 +628,8 @@ erDiagram
         string created_by
     }
     
-    place_llm_facts {
-        bigint id PK
-        bigint llm_enrichment_id FK
-        string field_name
-        string value_text
-        string value_type
-        numeric confidence
-        string provenance_kind
-        timestamptz created_at
-        timestamptz updated_at
-    }
-    
-    place_llm_sources {
-        bigint id PK
-        bigint llm_enrichment_id FK
-        string source_url
-        string source_domain
-        string source_kind
-        boolean trusted
-        numeric relevance_score
-        timestamptz fetched_at
-        timestamptz created_at
-    }
-    
-    place_llm_evidence_markers {
-        bigint id PK
-        bigint llm_enrichment_id FK
-        string field_name
-        string marker_text
-        string marker_type
-        numeric confidence
-        timestamptz created_at
-    }
-    
     %% ============================================
     %% EVIDENCE COLLECTION SCHEMA
-    %% ============================================
-    
-    place_source_evidence_runs {
-        bigint id PK
-        bigint place_id FK
-        bigint job_id FK
-        string worker_id
-        integer attempt_number
-        string collection_status
-        jsonb source_urls
-        jsonb source_evidence
-        jsonb evidence_markers
-        integer trusted_source_count
-        timestamptz created_at
-        timestamptz updated_at
-    }
-    
-    place_evidence_sources {
-        bigint id PK
-        bigint evidence_run_id FK
-        string source_url
-        string source_domain
-        string fetch_status
-        integer http_status
-        boolean trusted
-        string content_type
-        timestamptz fetched_at
-        integer content_length
-        string error_message
-        timestamptz created_at
-        timestamptz updated_at
-    }
-    
-    place_evidence_markers {
-        bigint id PK
-        bigint evidence_run_id FK
-        string field_name
-        string marker_text
-        string marker_type
-        numeric confidence
-        string source_url
-        string context_before
-        string context_after
-        timestamptz created_at
-    }
-    
-    %% ============================================
-    %% GOOGLE SOURCES SCHEMA
     %% ============================================
     
     place_google_sources {
@@ -475,30 +675,6 @@ erDiagram
         string attribution
         string google_photo_id
         timestamptz created_at
-    }
-    
-    place_google_types {
-        bigint id PK
-        bigint google_source_id FK
-        string google_type
-        boolean is_primary
-        timestamptz created_at
-    }
-    
-    place_google_amenities {
-        bigint id PK
-        bigint google_source_id FK
-        string amenity_key
-        string value_text
-        boolean value_boolean
-        numeric value_numeric
-        string value_type
-        string google_feature_type
-        boolean is_verified
-        numeric confidence_score
-        string source_section
-        timestamptz created_at
-        timestamptz updated_at
     }
     
     %% ============================================
@@ -748,29 +924,20 @@ erDiagram
     places ||--o{ osm_source : "sourced_from"
     places ||--o{ place_enrichment : "enriched"
     places ||--o{ place_llm_enrichments : "llm_enriched"
-    places ||--o{ place_source_evidence_runs : "evidenced"
     places ||--o{ place_google_sources : "google_cached"
     places ||--o{ place_duplicate_candidates : "has_duplicates"
     places ||--o{ enrichment_jobs : "queued"
+    places ||--o{ place_osm_properties : "has_osm_properties"
+    places ||--o{ place_google_properties : "has_google_properties"
+    places ||--o{ place_llm_properties : "has_llm_properties"
+    places ||--o{ place_user_properties : "has_user_properties"
     
     %% Enrichment job relationships
     enrichment_jobs ||--o{ place_llm_enrichments : "produces"
-    enrichment_jobs ||--o{ place_source_evidence_runs : "produces"
-    
-    %% LLM enrichment relationships
-    place_llm_enrichments ||--o{ place_llm_facts : "contains"
-    place_llm_enrichments ||--o{ place_llm_sources : "cites"
-    place_llm_enrichments ||--o{ place_llm_evidence_markers : "has"
-    
-    %% Evidence relationships
-    place_source_evidence_runs ||--o{ place_evidence_sources : "fetched"
-    place_source_evidence_runs ||--o{ place_evidence_markers : "contains"
     
     %% Google source relationships
     place_google_sources ||--o{ place_google_reviews : "has"
     place_google_sources ||--o{ place_google_photos : "has"
-    place_google_sources ||--o{ place_google_types : "has"
-    place_google_sources ||--o{ place_google_amenities : "has"
 ```
 
 ---
@@ -877,13 +1044,94 @@ erDiagram
         numeric lat
         numeric lon
         string country_code
+        string region
+        string city
+        string postcode
+        string address
         boolean has_toilet
         boolean has_shower
         boolean has_electricity
         boolean has_water
         boolean has_wifi
+        boolean pet_friendly
+        boolean caravan_allowed
+        boolean motorhome_allowed
+        boolean tent_allowed
+        string website
+        string phone
+        string email
+        string opening_hours
+        string fee_info
         string source_primary
+        numeric data_confidence
+        timestamptz last_seen_at
+        timestamptz last_enriched_at
         boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    
+    place_osm_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        string name
+        string place_type
+        string country_code
+        boolean wheelchair_accessible
+        boolean family_friendly
+        boolean pets_allowed
+        boolean caravan_allowed
+        boolean motorhome_allowed
+        boolean tent_allowed
+        boolean has_parking
+        boolean has_restrooms
+        boolean has_wifi
+        boolean has_shower
+        boolean has_electricity
+        boolean has_fresh_water
+        bigint osm_id
+        string osm_type
+        timestamptz osm_timestamp
+    }
+    
+    place_google_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        string name
+        string place_type
+        string country_code
+        numeric rating
+        integer review_count
+        string business_status
+        string google_place_id
+        timestamptz expires_at
+    }
+    
+    place_llm_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        string name
+        string place_type
+        string country_code
+        bigint llm_enrichment_id
+        string provider
+        string model
+        string summary_de
+        numeric trust_score
+        jsonb source_urls
+    }
+    
+    place_user_properties {
+        bigint id PK
+        bigint place_id FK
+        boolean is_current
+        string name
+        string place_type
+        string country_code
+        uuid user_id
     }
     
     osm_source {
@@ -936,6 +1184,10 @@ erDiagram
     places ||--o{ osm_source : "sourced_from"
     places ||--o{ place_enrichment : "enriched"
     places ||--o{ place_duplicate_candidates : "checked"
+    places ||--o{ place_osm_properties : "has_osm_properties"
+    places ||--o{ place_google_properties : "has_google_properties"
+    places ||--o{ place_llm_properties : "has_llm_properties"
+    places ||--o{ place_user_properties : "has_user_properties"
 ```
 
 ### LLM Enrichment Domain (Phase 1)
@@ -969,37 +1221,9 @@ erDiagram
         boolean is_current
     }
     
-    place_llm_facts {
-        bigint id PK
-        bigint llm_enrichment_id FK
-        string field_name
-        string value_text
-        numeric confidence
-        string provenance_kind
-    }
-    
-    place_llm_sources {
-        bigint id PK
-        bigint llm_enrichment_id FK
-        string source_url
-        string source_domain
-        boolean trusted
-    }
-    
-    place_llm_evidence_markers {
-        bigint id PK
-        bigint llm_enrichment_id FK
-        string field_name
-        string marker_text
-        numeric confidence
-    }
-    
     places ||--o{ enrichment_jobs : "queued"
     places ||--o{ place_llm_enrichments : "enriched"
     enrichment_jobs ||--o{ place_llm_enrichments : "produces"
-    place_llm_enrichments ||--o{ place_llm_facts : "extracts"
-    place_llm_enrichments ||--o{ place_llm_sources : "cites"
-    place_llm_enrichments ||--o{ place_llm_evidence_markers : "tracks"
 ```
 
 ### Google Sources Domain
@@ -1039,27 +1263,9 @@ erDiagram
         integer height
     }
     
-    place_google_types {
-        bigint id PK
-        bigint google_source_id FK
-        string google_type
-        boolean is_primary
-    }
-    
-    place_google_amenities {
-        bigint id PK
-        bigint google_source_id FK
-        string amenity_key
-        string value_text
-        boolean value_boolean
-        boolean is_verified
-    }
-    
     places ||--o{ place_google_sources : "cached"
     place_google_sources ||--o{ place_google_reviews : "has"
     place_google_sources ||--o{ place_google_photos : "has"
-    place_google_sources ||--o{ place_google_types : "has"
-    place_google_sources ||--o{ place_google_amenities : "has"
 ```
 
 ### Import & Queue Domain
@@ -1166,20 +1372,74 @@ erDiagram
 | places | osm_source | place_id | Place has OSM sources |
 | places | place_enrichment | place_id | Place has enrichment records |
 | places | place_llm_enrichments | place_id | Place has LLM enrichments |
-| places | place_source_evidence_runs | place_id | Place has evidence runs |
 | places | place_google_sources | place_id | Place has Google sources |
 | places | enrichment_jobs | place_id | Place has enrichment jobs |
+| places | place_osm_properties | place_id | Place has OSM properties |
+| places | place_google_properties | place_id | Place has Google properties |
+| places | place_llm_properties | place_id | Place has LLM properties |
+| places | place_user_properties | place_id | Place has user properties |
 | enrichment_jobs | place_llm_enrichments | job_id | Job produces LLM results |
-| enrichment_jobs | place_source_evidence_runs | job_id | Job produces evidence |
-| place_llm_enrichments | place_llm_facts | llm_enrichment_id | Enrichment has facts |
-| place_llm_enrichments | place_llm_sources | llm_enrichment_id | Enrichment cites sources |
-| place_llm_enrichments | place_llm_evidence_markers | llm_enrichment_id | Enrichment has markers |
-| place_source_evidence_runs | place_evidence_sources | evidence_run_id | Run fetched sources |
-| place_source_evidence_runs | place_evidence_markers | evidence_run_id | Run has markers |
 | place_google_sources | place_google_reviews | google_source_id | Source has reviews |
 | place_google_sources | place_google_photos | google_source_id | Source has photos |
-| place_google_sources | place_google_types | google_source_id | Source has types |
-| place_google_sources | place_google_amenities | google_source_id | Source has amenities |
+
+---
+
+## Removed Tables
+
+The following tables have been **dropped** as of migration `20260318214500_backfill_missing_llm_property_rows.sql` and are no longer part of the schema:
+
+| Table Name | Reason |
+|------------|--------|
+| `place_google_amenities` | Replaced by `place_google_properties` |
+| `place_google_types` | Replaced by `place_google_properties` |
+| `place_llm_facts` | Replaced by `place_llm_properties` |
+| `place_llm_sources` | Replaced by `place_llm_properties` |
+| `place_llm_evidence_markers` | Replaced by `place_llm_properties` |
+| `place_source_evidence_runs` | Consolidated into property tables |
+| `place_evidence_sources` | Consolidated into property tables |
+| `place_evidence_markers` | Consolidated into property tables |
+
+---
+
+## Partial Unique Indexes
+
+The following **partial unique indexes** enforce uniqueness constraints on active records:
+
+| Index Name | Table | Columns | Condition |
+|------------|-------|---------|-----------|
+| `uidx_osm_properties_place_current` | `place_osm_properties` | `(place_id)` | `WHERE is_current = true` |
+| `uidx_google_properties_place_current` | `place_google_properties` | `(place_id)` | `WHERE is_current = true` |
+| `uidx_llm_properties_place_current` | `place_llm_properties` | `(place_id)` | `WHERE is_current = true` |
+| `uidx_user_properties_place_user_current` | `place_user_properties` | `(place_id, user_id)` | `WHERE is_current = true` |
+
+These indexes ensure that each place can have only **one current** OSM, Google, and LLM property record, while user properties are unique per (place, user) pair.
+
+---
+
+## Migration History
+
+| Migration | Date | Description |
+|-----------|------|-------------|
+| `20260318200000` | 2026-03-18 | Initial migration creating property tables |
+| `20260318213000` | 2026-03-18 | Schema refinement and index creation |
+| `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 | Backfill missing LLM property rows; **current head** |
+
+---
+
+## Table Counts
+
+| Category | Count |
+|----------|-------|
+| User & Trip Management | 6 |
+| Places & Campsites (Core) | 5 |
+| Place Properties Tables | 4 |
+| Legacy Source Tables | 6 |
+| LLM Enrichment | 2 |
+| Evidence Collection | 3 |
+| Google Sources | 3 |
+| Import & Queue System | 8 |
+| Audit & Settings | 5 |
+| **Total Tables** | **42** |
 
 ---
 
@@ -1205,8 +1465,10 @@ erDiagram
 - **Timestamps**: Most tables have `created_at` and `updated_at` timestamps
 - **Soft Deletes**: Uses `is_active` flags instead of hard deletes
 - **Current Records**: Source tables use `is_current` to mark active records
+- **Partial Unique Indexes**: Used to enforce uniqueness only on active records
 - **Spatial Data**: Uses PostGIS `geometry` and `geography` types
 - **JSONB**: Used for flexible/unstructured data
+- **Property Tables**: The 4 property tables (`place_osm_properties`, `place_google_properties`, `place_llm_properties`, `place_user_properties`) share a common column schema for unified amenity and attribute storage
 
 ---
 
