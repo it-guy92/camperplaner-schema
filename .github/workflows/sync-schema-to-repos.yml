@@ -71,6 +71,7 @@ jobs:
       - name: Create PR in product repo
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.SCHEMA_SYNC_TOKEN }}
           script: |
             const branchName = '${{ steps.create-sync-branch.outputs.branch_name }}';
             const commitSha = '${{ steps.schema-info.outputs.commit_short }}';
@@ -170,6 +171,7 @@ jobs:
       - name: Create PR in worker repo
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.SCHEMA_SYNC_TOKEN }}
           script: |
             const branchName = '${{ steps.create-sync-branch.outputs.branch_name }}';
             const commitSha = '${{ steps.schema-info.outputs.commit_short }}';
