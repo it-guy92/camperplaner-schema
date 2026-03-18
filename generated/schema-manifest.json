@@ -17,8 +17,8 @@
     }
   ],
   "migrations": {
-    "latest": "20260317210003_source_family_constraints.sql",
-    "count": 27,
+    "latest": "20260318200000_add_property_tables.sql",
+    "count": 28,
     "pending_transfer": []
   },
   "contract_version": "1.0.0"

@@ -248,9 +248,9 @@ jobs:
             
             filename=$(basename "$file")
             
-            if grep -n "<<<<<<< HEAD\|=======\|>>>>>>>" "$file" > /dev/null 2>&1; then
+            if grep -nE "^<<<<<<<|^=======$|^>>>>>>>" "$file" > /dev/null 2>&1; then
               echo "  ❌ $filename: Found merge conflict markers"
-              grep -n "<<<<<<< HEAD\|=======\|>>>>>>>" "$file"
+              grep -nE "^<<<<<<<|^=======$|^>>>>>>>" "$file"
               CONFLICTS=$((CONFLICTS + 1))
             fi
           done
