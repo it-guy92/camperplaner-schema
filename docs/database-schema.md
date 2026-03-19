@@ -121,7 +121,7 @@ All four property tables share these column groups:
 | Table | Description | Primary Key | Source-Specific Columns |
 |-------|-------------|-------------|------------------------|
 | `place_osm_properties` | OSM property data | `id` (bigint) | `osm_source_id`, `osm_id`, `osm_type`, `osm_version`, `osm_timestamp` |
-| `place_google_properties` | Google Places property data | `id` (bigint) | `google_source_id`, `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at` |
+| `place_google_properties` | Google Places property data | `id` (bigint) | `google_source_id` (legacy lineage), `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at` |
 | `place_llm_properties` | LLM-enriched property data | `id` (bigint) | `llm_enrichment_id`, `provider`, `model`, `summary_de`, `trust_score`, `source_urls` |
 | `place_user_properties` | User-submitted property corrections | `id` (bigint) | `user_id` (uuid, NOT NULL) |
 
@@ -276,7 +276,7 @@ Google Places property data with aligned schema.
 | `has_visitor_center` | boolean | NULL | Has visitor center |
 | `has_lockers` | boolean | NULL | Has lockers |
 | `photography_allowed` | boolean | NULL | Photography allowed |
-| `google_source_id` | bigint | NULL | FK to place_google_sources.id |
+| `google_source_id` | bigint | NULL | Legacy lineage identifier (no active FK) |
 | `google_place_id` | text | NULL | Google Places API ID |
 | `rating` | numeric | NULL | Google rating (0-5) |
 | `review_count` | integer | NULL | Number of Google reviews |
@@ -360,7 +360,7 @@ LLM-enriched property data with aligned schema.
 | `has_visitor_center` | boolean | NULL | Has visitor center |
 | `has_lockers` | boolean | NULL | Has lockers |
 | `photography_allowed` | boolean | NULL | Photography allowed |
-| `llm_enrichment_id` | bigint | NULL | FK to place_llm_enrichments.id |
+| `llm_enrichment_id` | bigint | NULL | Legacy lineage identifier (table dropped in 20260319083000; no active FK) |
 | `provider` | text | NULL | LLM provider (openai/anthropic) |
 | `model` | text | NULL | Model identifier |
 | `summary_de` | text | NULL | German-language summary |
@@ -685,18 +685,18 @@ Place enrichment data and LLM processing.
 ### LLM Enrichment Tables
 
 #### `place_llm_enrichments`
-Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained LLM source-family parent table.
+Deprecated and dropped in `20260319083000_drop_llm_enrichments_and_google_sources.sql`.
 
 ### Google Sources Tables
 
 #### `place_google_sources`
-Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained Google source-family parent table.
+Deprecated and dropped in `20260319083000_drop_llm_enrichments_and_google_sources.sql`.
 
 #### `place_google_reviews`
-Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained 1:n Google child table.
+Active. Parent relation migrated to `place_google_properties` via `google_property_id` in `20260319083000_drop_llm_enrichments_and_google_sources.sql`.
 
 #### `place_google_photos`
-Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained 1:n Google child table.
+Active. Parent relation migrated to `place_google_properties` via `google_property_id` in `20260319083000_drop_llm_enrichments_and_google_sources.sql`.
 
 ### Queue & Import Tables
 
@@ -1081,7 +1081,7 @@ New Phase 2 schema uses "aligned property tables" - a set of four tables with id
 
 2. **Google Family** (`place_google_properties`)
    - Shared columns: 62 columns (same as OSM)
-   - Source-specific: `google_source_id`, `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at`
+- Source-specific: `google_source_id` (legacy lineage), `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at`
 
 3. **LLM Family** (`place_llm_properties`)
    - Shared columns: 62 columns (same as OSM)
@@ -1106,6 +1106,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_current
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260319083000_drop_llm_enrichments_and_google_sources.sql` | 2026-03-19 08:30 | Rekey `place_google_reviews`/`place_google_photos` to `place_google_properties` via `google_property_id`; drop `place_google_sources` and `place_llm_enrichments` |
 | `20260319071000_restore_retained_source_tables.sql` | 2026-03-19 07:10 | Restore retained source-family/raw tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`) and retained Google child tables (`place_google_reviews`, `place_google_photos`) with best-effort backfill from aligned property tables |
 | `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql` | 2026-03-18 23:00 | **BREAKING:** Cut over `get_place_source_bundle` + `campsite_full` to aligned property tables; drop legacy source tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`, `place_google_reviews`, `place_google_photos`); trim `places` business columns |
 | `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 21:45 | Backfill missing historical rows from place_llm_enrichments into place_llm_properties |

@@ -1,9 +1,9 @@
 # Worker Schema Migration Guide (Schema Repo - Canonical)
 
 > **Location:** This is the canonical source. Product repo references this file.
-> **Document Status:** OPERATIONAL  
+> **Document Status:** HISTORICAL (Phase 1 reference)  
 > **Date:** 2026-03-16  
-> **Scope:** Phase 1 Enrichment Schema Migration  
+> **Scope:** Phase 1 Enrichment Schema Migration (superseded by later contraction phases)  
 > **Target Audience:** DevOps Operators, Worker Maintainers  
 
 ---
@@ -23,6 +23,8 @@
 ## Overview
 
 This guide covers the complete deployment sequence for Phase 1 of the enrichment schema migration. The migration is **additive-only**, meaning no destructive changes are made. This design choice ensures zero-downtime deployment and safe rollback capabilities.
+
+> **Current Schema Note (2026-03-19):** `place_llm_enrichments` and `place_google_sources` were dropped in `20260319083000_drop_llm_enrichments_and_google_sources.sql`. Use `place_llm_properties` and `place_google_properties` as the active source tables; Google child tables now link to `place_google_properties`.
 
 ### What Changes in Phase 1
 
@@ -262,7 +264,8 @@ ALTER TABLE enrichment_jobs DROP COLUMN IF EXISTS last_error_message;
 ALTER TABLE enrichment_jobs DROP COLUMN IF EXISTS canonical_place_id;
 
 -- Drop new tables
--- NOTE: place_llm_enrichments and place_google_sources are retained tables.
+-- NOTE: place_llm_enrichments and place_google_sources were later dropped in
+--       20260319083000_drop_llm_enrichments_and_google_sources.sql.
 DROP TABLE IF EXISTS place_source_evidence_runs;
 ```
 

@@ -2382,137 +2382,9 @@ export interface Database {
           source_metadata?: Json
         }
       }
-      place_llm_enrichments: {
-        Row: {
-          id: number
-          place_id: number
-          job_id: number | null
-          provider: string
-          model: string
-          prompt_version: string | null
-          summary_de: string | null
-          confidence: number | null
-          hallucination_risk: number | null
-          token_input: number | null
-          token_output: number | null
-          cost_usd: number | null
-          status: string
-          started_at: string | null
-          completed_at: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id: number
-          place_id: number
-          job_id?: number | null
-          provider: string
-          model: string
-          prompt_version?: string | null
-          summary_de?: string | null
-          confidence?: number | null
-          hallucination_risk?: number | null
-          token_input?: number | null
-          token_output?: number | null
-          cost_usd?: number | null
-          status: string
-          started_at?: string | null
-          completed_at?: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-          created_by?: string | null
-        }
-        Update: {
-          id?: number
-          place_id?: number
-          job_id?: number | null
-          provider?: string
-          model?: string
-          prompt_version?: string | null
-          summary_de?: string | null
-          confidence?: number | null
-          hallucination_risk?: number | null
-          token_input?: number | null
-          token_output?: number | null
-          cost_usd?: number | null
-          status?: string
-          started_at?: string | null
-          completed_at?: string | null
-          is_current?: boolean
-          created_at?: string
-          updated_at?: string
-          created_by?: string | null
-        }
-      }
-      place_google_sources: {
-        Row: {
-          id: number
-          place_id: number
-          google_place_id: string
-          name: string | null
-          formatted_address: string | null
-          phone: string | null
-          website: string | null
-          rating: number | null
-          review_count: number | null
-          business_status: string | null
-          lat: number | null
-          lon: number | null
-          raw_payload: Json | null
-          fetched_at: string
-          expires_at: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: number
-          place_id: number
-          google_place_id: string
-          name?: string | null
-          formatted_address?: string | null
-          phone?: string | null
-          website?: string | null
-          rating?: number | null
-          review_count?: number | null
-          business_status?: string | null
-          lat?: number | null
-          lon?: number | null
-          raw_payload?: Json | null
-          fetched_at: string
-          expires_at?: string | null
-          is_current: boolean
-          created_at: string
-          updated_at: string
-        }
-        Update: {
-          id?: number
-          place_id?: number
-          google_place_id?: string
-          name?: string | null
-          formatted_address?: string | null
-          phone?: string | null
-          website?: string | null
-          rating?: number | null
-          review_count?: number | null
-          business_status?: string | null
-          lat?: number | null
-          lon?: number | null
-          raw_payload?: Json | null
-          fetched_at?: string
-          expires_at?: string | null
-          is_current?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-      }
       place_google_reviews: {
         Row: {
           id: number
-          google_source_id: number
           author_name: string | null
           rating: number | null
           language_code: string | null
@@ -2521,10 +2393,10 @@ export interface Database {
           relative_time_description: string | null
           google_review_id: string | null
           created_at: string
+          google_property_id: number
         }
         Insert: {
           id: number
-          google_source_id: number
           author_name?: string | null
           rating?: number | null
           language_code?: string | null
@@ -2533,10 +2405,10 @@ export interface Database {
           relative_time_description?: string | null
           google_review_id?: string | null
           created_at: string
+          google_property_id: number
         }
         Update: {
           id?: number
-          google_source_id?: number
           author_name?: string | null
           rating?: number | null
           language_code?: string | null
@@ -2545,38 +2417,39 @@ export interface Database {
           relative_time_description?: string | null
           google_review_id?: string | null
           created_at?: string
+          google_property_id?: number
         }
       }
       place_google_photos: {
         Row: {
           id: number
-          google_source_id: number
           photo_reference: string
           width: number | null
           height: number | null
           attribution: string | null
           google_photo_id: string | null
           created_at: string
+          google_property_id: number
         }
         Insert: {
           id: number
-          google_source_id: number
           photo_reference: string
           width?: number | null
           height?: number | null
           attribution?: string | null
           google_photo_id?: string | null
           created_at: string
+          google_property_id: number
         }
         Update: {
           id?: number
-          google_source_id?: number
           photo_reference?: string
           width?: number | null
           height?: number | null
           attribution?: string | null
           google_photo_id?: string | null
           created_at?: string
+          google_property_id?: number
         }
       }
     }
