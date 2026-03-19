@@ -587,7 +587,7 @@ Minimal place identity and geospatial anchor table.
 | `updated_at` | timestamptz | NOT NULL | Last update |
 
 #### `osm_source`
-Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
+Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained OSM source-raw table.
 
 #### `campsites_cache`
 Cached campsite data.
@@ -685,18 +685,18 @@ Place enrichment data and LLM processing.
 ### LLM Enrichment Tables
 
 #### `place_llm_enrichments`
-Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
+Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained LLM source-family parent table.
 
 ### Google Sources Tables
 
 #### `place_google_sources`
-Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
+Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained Google source-family parent table.
 
 #### `place_google_reviews`
-Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
+Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained 1:n Google child table.
 
 #### `place_google_photos`
-Deprecated and dropped in `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql`.
+Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained 1:n Google child table.
 
 ### Queue & Import Tables
 
@@ -1106,6 +1106,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_current
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260319071000_restore_retained_source_tables.sql` | 2026-03-19 07:10 | Restore retained source-family/raw tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`) and retained Google child tables (`place_google_reviews`, `place_google_photos`) with best-effort backfill from aligned property tables |
 | `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql` | 2026-03-18 23:00 | **BREAKING:** Cut over `get_place_source_bundle` + `campsite_full` to aligned property tables; drop legacy source tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`, `place_google_reviews`, `place_google_photos`); trim `places` business columns |
 | `20260318214500_backfill_missing_llm_property_rows.sql` | 2026-03-18 21:45 | Backfill missing historical rows from place_llm_enrichments into place_llm_properties |
 | `20260318213000_backfill_property_tables_and_drop_deprecated_fact_tables.sql` | 2026-03-18 21:30 | Backfill aligned property tables from existing source data; DROP 8 deprecated tables (place_google_amenities, place_google_types, place_llm_facts, place_llm_sources, place_llm_evidence_markers, place_source_evidence_runs, place_evidence_sources, place_evidence_markers) |

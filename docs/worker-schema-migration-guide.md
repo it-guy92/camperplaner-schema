@@ -262,8 +262,7 @@ ALTER TABLE enrichment_jobs DROP COLUMN IF EXISTS last_error_message;
 ALTER TABLE enrichment_jobs DROP COLUMN IF EXISTS canonical_place_id;
 
 -- Drop new tables
-DROP TABLE IF EXISTS place_llm_enrichments;
-DROP TABLE IF EXISTS place_google_sources;
+-- NOTE: place_llm_enrichments and place_google_sources are retained tables.
 DROP TABLE IF EXISTS place_source_evidence_runs;
 ```
 
