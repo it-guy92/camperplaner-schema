@@ -208,11 +208,15 @@ erDiagram
         boolean has_visitor_center
         boolean has_lockers
         boolean photography_allowed
-        bigint osm_source_id
         bigint osm_id
         string osm_type
         integer osm_version
         timestamptz osm_timestamp
+        timestamptz imported_at
+        timestamptz first_seen_at
+        timestamptz last_seen_at
+        bigint last_import_run_id
+        jsonb source_metadata
     }
     
     place_google_properties {
@@ -418,35 +422,6 @@ erDiagram
         boolean has_lockers
         boolean photography_allowed
         uuid user_id
-    }
-    
-    %% ----------------------------------------------------------
-    %% LEGACY SOURCE TABLES (Remaining)
-    %% ----------------------------------------------------------
-    
-    osm_source {
-        bigint id PK
-        bigint place_id FK
-        string osm_type
-        bigint osm_id
-        integer osm_version
-        jsonb tags
-        string raw_name
-        timestamptz source_snapshot_date
-        timestamptz imported_at
-        timestamptz first_seen_at
-        timestamptz last_seen_at
-        bigint last_import_run_id
-        string geometry_kind
-        string geometry_hash
-        geometry centroid
-        geometry geom
-        timestamptz osm_timestamp
-        string osmium_unique_id
-        string first_seen_snapshot_id
-        string last_seen_snapshot_id
-        boolean is_current
-        jsonb source_metadata
     }
     
     campsites_cache {
@@ -779,58 +754,6 @@ erDiagram
         integer retry_count
     }
     
-    import_snapshot {
-        uuid id PK
-        string region
-        string source_name
-        timestamptz source_pbf_date
-        string source_state
-        timestamptz imported_at
-        integer matched_count
-        integer created_count
-        integer stale_count
-        integer duplicate_candidates_count
-        integer error_count
-    }
-    
-    osm_type_transitions {
-        bigint id PK
-        string old_osm_type
-        bigint old_osm_id
-        string new_osm_type
-        bigint new_osm_id
-        timestamptz detected_at
-        string transition_type
-        numeric confidence
-        string merge_decision
-        bigint merged_place_id
-    }
-    
-    description_generation_jobs {
-        uuid id PK
-        uuid place_id
-        string status
-        integer priority
-        integer attempts
-        string error_message
-        timestamptz created_at
-        timestamptz updated_at
-        timestamptz completed_at
-    }
-    
-    website_scraping_jobs {
-        uuid id PK
-        uuid place_id
-        string website_url
-        string status
-        integer priority
-        integer attempts
-        jsonb extracted_data
-        string error_message
-        timestamptz created_at
-        timestamptz updated_at
-        timestamptz completed_at
-    }
     
     %% ============================================
     %% AUDIT & SETTINGS
@@ -885,24 +808,6 @@ erDiagram
         timestamptz created_at
     }
     
-    cutover_metric_snapshots {
-        bigint id PK
-        numeric import_coverage_ratio
-        numeric queue_backlog
-        numeric job_failures_24h
-        numeric freshness_stale_count
-        numeric enrichment_spend_usd_24h
-        numeric google_calls_24h
-        numeric canonical_legacy_divergence
-        numeric unresolved_mappings
-        timestamptz created_at
-    }
-    
-    cutover_runtime_flags {
-        string key PK
-        string value
-        timestamptz updated_at
-    }
     
     %% ============================================
     %% RELATIONSHIPS
@@ -921,15 +826,14 @@ erDiagram
     trips ||--o{ trip_reminders : "has"
     
     %% Place relationships
-    places ||--o{ osm_source : "sourced_from"
     places ||--o{ place_enrichment : "enriched"
     places ||--o{ place_llm_enrichments : "llm_enriched"
     places ||--o{ place_google_sources : "google_cached"
     places ||--o{ place_duplicate_candidates : "has_duplicates"
     places ||--o{ enrichment_jobs : "queued"
-    places ||--o{ place_osm_properties : "has_osm_properties"
-    places ||--o{ place_google_properties : "has_google_properties"
-    places ||--o{ place_llm_properties : "has_llm_properties"
+    places ||--o| place_osm_properties : "has_osm_properties"
+    places ||--o| place_google_properties : "has_google_properties"
+    places ||--o| place_llm_properties : "has_llm_properties"
     places ||--o{ place_user_properties : "has_user_properties"
     
     %% Enrichment job relationships
@@ -1093,6 +997,11 @@ erDiagram
         bigint osm_id
         string osm_type
         timestamptz osm_timestamp
+        timestamptz imported_at
+        timestamptz first_seen_at
+        timestamptz last_seen_at
+        bigint last_import_run_id
+        jsonb source_metadata
     }
     
     place_google_properties {
@@ -1134,15 +1043,6 @@ erDiagram
         uuid user_id
     }
     
-    osm_source {
-        bigint id PK
-        bigint place_id FK
-        string osm_type
-        bigint osm_id
-        jsonb tags
-        boolean is_current
-    }
-    
     campsites_cache {
         uuid id PK
         uuid place_id
@@ -1181,12 +1081,11 @@ erDiagram
         timestamptz expires_at
     }
     
-    places ||--o{ osm_source : "sourced_from"
     places ||--o{ place_enrichment : "enriched"
     places ||--o{ place_duplicate_candidates : "checked"
-    places ||--o{ place_osm_properties : "has_osm_properties"
-    places ||--o{ place_google_properties : "has_google_properties"
-    places ||--o{ place_llm_properties : "has_llm_properties"
+    places ||--o| place_osm_properties : "has_osm_properties"
+    places ||--o| place_google_properties : "has_google_properties"
+    places ||--o| place_llm_properties : "has_llm_properties"
     places ||--o{ place_user_properties : "has_user_properties"
 ```
 
@@ -1320,37 +1219,6 @@ erDiagram
         integer priority
     }
     
-    import_snapshot {
-        uuid id PK
-        string region
-        string source_name
-        timestamptz imported_at
-        integer matched_count
-    }
-    
-    osm_type_transitions {
-        bigint id PK
-        string old_osm_type
-        bigint old_osm_id
-        string new_osm_type
-        bigint new_osm_id
-        string merge_decision
-    }
-    
-    description_generation_jobs {
-        uuid id PK
-        uuid place_id
-        string status
-        integer priority
-    }
-    
-    website_scraping_jobs {
-        uuid id PK
-        uuid place_id
-        string website_url
-        string status
-        jsonb extracted_data
-    }
 ```
 
 ---
@@ -1369,7 +1237,6 @@ erDiagram
 | profiles | campsite_prices | user_id | User submits prices |
 | trips | trip_stops | trip_id | Trip has stops |
 | trips | trip_reminders | trip_id | Trip has reminders |
-| places | osm_source | place_id | Place has OSM sources |
 | places | place_enrichment | place_id | Place has enrichment records |
 | places | enrichment_jobs | place_id | Place has enrichment jobs |
 | places | place_osm_properties | place_id | Place has OSM properties |
@@ -1400,18 +1267,18 @@ The following tables have been **dropped** by Phase 2/3 migrations and are no lo
 
 ---
 
-## Partial Unique Indexes
+## Unique Indexes
 
-The following **partial unique indexes** enforce uniqueness constraints on active records:
+The following unique indexes enforce one-row cardinality in aligned property tables:
 
 | Index Name | Table | Columns | Condition |
 |------------|-------|---------|-----------|
-| `uidx_osm_properties_place_current` | `place_osm_properties` | `(place_id)` | `WHERE is_current = true` |
-| `uidx_google_properties_place_current` | `place_google_properties` | `(place_id)` | `WHERE is_current = true` |
-| `uidx_llm_properties_place_current` | `place_llm_properties` | `(place_id)` | `WHERE is_current = true` |
+| `uidx_osm_properties_place_unique` | `place_osm_properties` | `(place_id)` | - |
+| `uidx_google_properties_place_unique` | `place_google_properties` | `(place_id)` | - |
+| `uidx_llm_properties_place_unique` | `place_llm_properties` | `(place_id)` | - |
 | `uidx_user_properties_place_user_current` | `place_user_properties` | `(place_id, user_id)` | `WHERE is_current = true` |
 
-These indexes ensure that each place can have only **one current** OSM, Google, and LLM property record, while user properties are unique per (place, user) pair.
+These indexes ensure that each place can have only one OSM, Google, and LLM property record, while user properties remain unique per (place, user) pair for current rows.
 
 ---
 
@@ -1419,7 +1286,8 @@ These indexes ensure that each place can have only **one current** OSM, Google, 
 
 | Migration | Date | Description |
 |-----------|------|-------------|
-| `20260319083000_drop_llm_enrichments_and_google_sources.sql` | 2026-03-19 | Move Google review/photo parent FK to `place_google_properties` and drop `place_google_sources` + `place_llm_enrichments`; **current head** |
+| `20260319100000_enforce_single_row_per_place_in_property_tables.sql` | 2026-03-19 | Deduplicate OSM/Google/LLM property rows and enforce strict unique `place_id` cardinality; **current head** |
+| `20260319083000_drop_llm_enrichments_and_google_sources.sql` | 2026-03-19 | Move Google review/photo parent FK to `place_google_properties` and drop `place_google_sources` + `place_llm_enrichments` |
 | `20260319071000_restore_retained_source_tables.sql` | 2026-03-19 | Temporary restoration of source-family/raw tables after accidental drop |
 | `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql` | 2026-03-18 | **BREAKING:** Cut over RPC/view to aligned property tables, dropped remaining legacy source tables, trimmed `places` business columns |
 | `20260318200000` | 2026-03-18 | Initial migration creating property tables |

@@ -31,19 +31,21 @@ Short, actionable summary of the full audit in `docs/database-access-audit.md`.
   - `osm_refresh_queue` migrated to `osm_refresh_jobs`
   - `country_sequence_state` migrated to `app_settings` JSON state keys (`geofabrik_sequence_<COUNTRY>`)
 
+- `osm_source` is decommissioned in migration `20260320060000_drop_unused_job_import_and_cutover_tables.sql`
+  - Selected provenance fields move to `place_osm_properties`
+  - `place_osm_properties` becomes the sole OSM source-of-truth table
+  - Coordinated rollout required: stop workers during migration, restart only the refactored worker version afterward
+
 - System catalog usage detected in scripts (not business tables):
   - `pg_policies`
   - `pg_tables`
 
 ## Important Non-Leichen (Do Not Drop)
 
-- `osm_source`
 - `osm_refresh_jobs`
 - `country_import_status`
-- `import_snapshot`
-- `osm_type_transitions`
 
-These are used by worker runtime paths and/or import flows.
+These remain active in worker runtime paths and/or import flows.
 
 ## Where to Look Next
 
@@ -53,5 +55,5 @@ These are used by worker runtime paths and/or import flows.
 ## Suggested Follow-up
 
 1. Deploy migration and regenerate DB types
-2. Remove doc-only legacy table examples (`README`, package docs)
-3. Re-run cutover metrics and validate no regression in cache/refresh flows
+2. Update product/worker consumers to remove dropped-table references
+3. Re-run import and enrichment smoke checks after deployment

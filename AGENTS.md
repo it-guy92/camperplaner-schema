@@ -138,6 +138,18 @@ After migrations are applied, regenerate types:
 supabase gen types typescript --local > generated/database.types.ts
 ```
 
+If local Docker/Supabase is unavailable but `.env.local` contains
+`NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_DB_PASSWORD`, use the remote path:
+
+```bash
+supabase link --project-ref <ref> --password "$SUPABASE_DB_PASSWORD"
+supabase db push --linked
+node scripts/generate-types.js
+```
+
+The consumer sync workflow opens PRs only after `generated/database.types.ts`
+changes on a push to `main`.
+
 ### Documentation
 
 After any schema change, update:
@@ -286,6 +298,12 @@ Hotfixes still require:
 - Schema repo only provides migration files
 - Product repo handles execution
 - Check product CI/CD logs
+
+### "Destructive cutover fails on a column drop"
+
+- Check dependent views/functions before dropping the column
+- Recreate `campsite_full` / `campsite_api_read_model` if they still depend on
+  removed `place_osm_properties` columns
 
 ---
 

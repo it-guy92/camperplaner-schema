@@ -1,8 +1,8 @@
 # CamperPlaner Database Schema
 
 > **Location:** This is the canonical source of truth for the CamperPlaner database schema.
-> **Generated:** 2026-03-18
-> **Migration Head:** 20260318214500_backfill_missing_llm_property_rows.sql
+> **Generated:** 2026-03-20
+> **Migration Head:** 20260320060000_drop_unused_job_import_and_cutover_tables.sql
 
 ---
 
@@ -10,8 +10,8 @@
 
 | Metric | Count |
 |--------|-------|
-| **Total Tables** | 41 |
-| **User Tables** | 34 |
+| **Total Tables** | 34 |
+| **User Tables** | 27 |
 | **System Tables** | 7 (PostGIS) |
 | **Views** | 6 |
 | **Enums** | 20 |
@@ -50,16 +50,11 @@
 |-------|-------------|-------------|
 | `countries` | Country definitions for imports | `iso_code` (text) |
 | `country_import_status` | Import status tracking per country | `id` (uuid) |
-| `osm_source` | OSM source data tracking | `id` (bigint) |
 | `osm_import_queue` | OSM import work queue | `id` (bigint) |
 | `osm_import_jobs` | OSM import job tracking | `id` (uuid) |
 | `osm_import_runs` | OSM import run history | `id` (bigint) |
 | `osm_refresh_jobs` | OSM data refresh jobs | `id` (bigint) |
-| `osm_type_transitions` | OSM place type transition rules | `id` (bigint) |
-| `import_snapshot` | Import snapshots for recovery | `id` (uuid) |
-| `description_generation_jobs` | LLM description generation queue | `id` (uuid) |
 | `enrichment_jobs` | Data enrichment job queue | `id` (bigint) |
-| `website_scraping_jobs` | Website scraping job queue | `id` (uuid) |
 
 ### 4. Audit & Logging
 
@@ -69,8 +64,6 @@
 | `app_settings` | Application configuration | `id` (uuid) |
 | `settings_audit_log` | Settings change audit trail | `id` (uuid) |
 | `cutover_audit_log` | Database cutover audit trail | `id` (bigint) |
-| `cutover_metric_snapshots` | Cutover performance metrics | `id` (bigint) |
-| `cutover_runtime_flags` | Cutover feature flags | `key` (text) |
 
 ### 5. Phase 1: Enrichment Schema (DEPRECATED - Tables Dropped)
 
@@ -91,7 +84,27 @@ The following tables have been **dropped** as part of the Phase 2 schema restruc
 
 **Migration that dropped these tables:** `20260318213000_backfill_property_tables_and_drop_deprecated_fact_tables.sql`
 
-### 6. Phase 2: Aligned Property Tables (NEW)
+### 6. Phase 3: Dropped Import, Job, Cutover, and Source Tables
+
+> ⚠️ **DROPPED** in migration `20260320060000_drop_unused_job_import_and_cutover_tables.sql`
+
+The following application-owned tables have been removed from the canonical schema:
+
+| Table | Status | Former Description |
+|-------|--------|-------------------|
+| `description_generation_jobs` | **DROPPED** | LLM description generation queue |
+| `website_scraping_jobs` | **DROPPED** | Website scraping job queue |
+| `osm_source` | **DROPPED** | Legacy OSM source-raw table |
+| `osm_type_transitions` | **DROPPED** | OSM type transition tracking |
+| `import_snapshot` | **DROPPED** | Import snapshot/checkpoint data |
+| `cutover_runtime_flags` | **DROPPED** | Cutover runtime feature flags |
+| `cutover_metric_snapshots` | **DROPPED** | Cutover metric snapshots |
+
+**Migration that dropped these tables:** `20260320060000_drop_unused_job_import_and_cutover_tables.sql`
+
+**Coordinated deployment note:** Stop workers before applying this migration. Restart workers only after the refactored worker build that no longer references `osm_source` or `place_osm_properties.osm_source_id` is deployed.
+
+### 7. Aligned Property Tables (NEW)
 
 > ✨ **NEW** in migration `20260318200000_add_property_tables.sql`
 
@@ -120,7 +133,7 @@ All four property tables share these column groups:
 
 | Table | Description | Primary Key | Source-Specific Columns |
 |-------|-------------|-------------|------------------------|
-| `place_osm_properties` | OSM property data | `id` (bigint) | `osm_source_id`, `osm_id`, `osm_type`, `osm_version`, `osm_timestamp` |
+| `place_osm_properties` | OSM property data | `id` (bigint) | `osm_id`, `osm_type`, `osm_version`, `osm_timestamp`, `imported_at`, `first_seen_at`, `last_seen_at`, `last_import_run_id`, `source_metadata` |
 | `place_google_properties` | Google Places property data | `id` (bigint) | `google_source_id` (legacy lineage), `google_place_id`, `rating`, `review_count`, `business_status`, `expires_at` |
 | `place_llm_properties` | LLM-enriched property data | `id` (bigint) | `llm_enrichment_id`, `provider`, `model`, `summary_de`, `trust_score`, `source_urls` |
 | `place_user_properties` | User-submitted property corrections | `id` (bigint) | `user_id` (uuid, NOT NULL) |
@@ -194,18 +207,25 @@ OSM property data with aligned schema.
 | `has_visitor_center` | boolean | NULL | Has visitor center |
 | `has_lockers` | boolean | NULL | Has lockers |
 | `photography_allowed` | boolean | NULL | Photography allowed |
-| `osm_source_id` | bigint | NULL | FK to osm_source.id |
 | `osm_id` | bigint | NULL | OSM object ID |
 | `osm_type` | text | NULL | OSM object type (node/way/relation) |
 | `osm_version` | integer | NULL | OSM version number |
 | `osm_timestamp` | timestamptz | NULL | OSM last edit timestamp |
+| `imported_at` | timestamptz | NULL | Original import timestamp migrated from osm_source |
+| `first_seen_at` | timestamptz | NULL | First-seen timestamp migrated from osm_source |
+| `last_seen_at` | timestamptz | NULL | Last-seen timestamp migrated from osm_source |
+| `last_import_run_id` | bigint | NULL | Last osm import run reference migrated from osm_source |
+| `source_metadata` | jsonb | NULL, DEFAULT '{}'::jsonb | Source metadata migrated from osm_source |
 
 **Indexes:**
-- `uidx_osm_properties_place_current` (partial, unique) ON `(place_id)` WHERE `is_current = true`
+- `uidx_osm_properties_place_unique` (unique) ON `(place_id)`
 - `idx_osm_properties_place_id` ON `(place_id)`
 - `idx_osm_properties_is_current` ON `(is_current)` WHERE `is_current = true`
 - `idx_osm_properties_osm_id` ON `(osm_id)` WHERE `osm_id IS NOT NULL`
+- `idx_osm_properties_osm_type_id` ON `(osm_type, osm_id)` WHERE `osm_type IS NOT NULL AND osm_id IS NOT NULL`
 - `idx_osm_properties_place_current` ON `(place_id, is_current)` WHERE `is_current = true`
+
+**Cutover note:** Stop worker processes during this migration and restart only the refactored worker version that reads and writes `place_osm_properties` exclusively.
 
 #### `place_google_properties`
 Google Places property data with aligned schema.
@@ -284,7 +304,7 @@ Google Places property data with aligned schema.
 | `expires_at` | timestamptz | NULL | Cache expiration time |
 
 **Indexes:**
-- `uidx_google_properties_place_current` (partial, unique) ON `(place_id)` WHERE `is_current = true`
+- `uidx_google_properties_place_unique` (unique) ON `(place_id)`
 - `idx_google_properties_place_id` ON `(place_id)`
 - `idx_google_properties_is_current` ON `(is_current)` WHERE `is_current = true`
 - `idx_google_properties_google_place_id` ON `(google_place_id)` WHERE `google_place_id IS NOT NULL`
@@ -368,7 +388,7 @@ LLM-enriched property data with aligned schema.
 | `source_urls` | jsonb | NULL | Array of source URLs |
 
 **Indexes:**
-- `uidx_llm_properties_place_current` (partial, unique) ON `(place_id)` WHERE `is_current = true`
+- `uidx_llm_properties_place_unique` (unique) ON `(place_id)`
 - `idx_llm_properties_place_id` ON `(place_id)`
 - `idx_llm_properties_is_current` ON `(is_current)` WHERE `is_current = true`
 - `idx_llm_properties_provider` ON `(provider)` WHERE `provider IS NOT NULL`
@@ -586,9 +606,6 @@ Minimal place identity and geospatial anchor table.
 | `created_at` | timestamptz | NOT NULL | Creation time |
 | `updated_at` | timestamptz | NOT NULL | Last update |
 
-#### `osm_source`
-Active (restored in `20260319071000_restore_retained_source_tables.sql`) as retained OSM source-raw table.
-
 #### `campsites_cache`
 Cached campsite data.
 
@@ -733,38 +750,6 @@ Data enrichment job queue.
 | `last_error_message` | text | NULL | Error message |
 | `canonical_place_id` | uuid | NULL | Place UUID |
 | `metadata` | jsonb | NULL | Metadata JSON |
-
-#### `description_generation_jobs`
-LLM description generation queue.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | uuid | PK, NOT NULL | Unique identifier |
-| `place_id` | uuid | NOT NULL | Place reference |
-| `status` | text | NULL | Job status |
-| `priority` | integer | NULL | Priority level |
-| `attempts` | integer | NULL | Attempt count |
-| `error_message` | text | NULL | Error message |
-| `created_at` | timestamptz | NULL | Creation time |
-| `updated_at` | timestamptz | NULL | Update time |
-| `completed_at` | timestamptz | NULL | Completion time |
-
-#### `website_scraping_jobs`
-Website scraping job queue.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | uuid | PK, NOT NULL | Unique identifier |
-| `place_id` | uuid | NOT NULL | Place reference |
-| `website_url` | text | NOT NULL | URL to scrape |
-| `status` | text | NULL | Job status |
-| `priority` | integer | NULL | Priority level |
-| `attempts` | integer | NULL | Attempt count |
-| `extracted_data` | jsonb | NULL | Extracted data |
-| `error_message` | text | NULL | Error message |
-| `created_at` | timestamptz | NULL | Creation time |
-| `updated_at` | timestamptz | NULL | Update time |
-| `completed_at` | timestamptz | NULL | Completion time |
 
 #### `countries`
 Country definitions for imports.
@@ -1077,7 +1062,7 @@ New Phase 2 schema uses "aligned property tables" - a set of four tables with id
 
 1. **OSM Family** (`place_osm_properties`)
    - Shared columns: 62 columns covering identity, location, contact, facilities, amenities
-   - Source-specific: `osm_source_id`, `osm_id`, `osm_type`, `osm_version`, `osm_timestamp`
+   - Source-specific: `osm_id`, `osm_type`, `osm_version`, `osm_timestamp`, `imported_at`, `first_seen_at`, `last_seen_at`, `last_import_run_id`, `source_metadata`
 
 2. **Google Family** (`place_google_properties`)
    - Shared columns: 62 columns (same as OSM)
@@ -1091,13 +1076,14 @@ New Phase 2 schema uses "aligned property tables" - a set of four tables with id
    - Shared columns: 62 columns (same as OSM)
    - Source-specific: `user_id` (uuid, NOT NULL)
 
-### Current-Row Semantics
-Each property table enforces exactly one current row per place (or per place+user for user properties) using partial unique indexes:
+### Property Row Cardinality
+`place_osm_properties`, `place_google_properties`, and `place_llm_properties` enforce exactly one row per `place_id` using strict unique indexes.
+
+`place_user_properties` remains user-scoped and enforces one current row per `(place_id, user_id)`.
 
 ```sql
-CREATE UNIQUE INDEX uidx_osm_properties_place_current
-    ON place_osm_properties(place_id)
-    WHERE is_current = true;
+CREATE UNIQUE INDEX uidx_osm_properties_place_unique
+    ON place_osm_properties(place_id);
 ```
 
 ---
@@ -1106,6 +1092,8 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_current
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260320060000_drop_unused_job_import_and_cutover_tables.sql` | 2026-03-20 06:00 | **BREAKING:** Add/backfill OSM provenance fields on `place_osm_properties`, drop `place_osm_properties.osm_source_id`, drop `osm_source`, and remove unused job/import/cutover tables (`description_generation_jobs`, `website_scraping_jobs`, `osm_type_transitions`, `import_snapshot`, `cutover_runtime_flags`, `cutover_metric_snapshots`) |
+| `20260319100000_enforce_single_row_per_place_in_property_tables.sql` | 2026-03-19 10:00 | Deduplicate `place_osm_properties`/`place_google_properties`/`place_llm_properties`; enforce strict unique `place_id` cardinality (1 row per place) |
 | `20260319083000_drop_llm_enrichments_and_google_sources.sql` | 2026-03-19 08:30 | Rekey `place_google_reviews`/`place_google_photos` to `place_google_properties` via `google_property_id`; drop `place_google_sources` and `place_llm_enrichments` |
 | `20260319071000_restore_retained_source_tables.sql` | 2026-03-19 07:10 | Restore retained source-family/raw tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`) and retained Google child tables (`place_google_reviews`, `place_google_photos`) with best-effort backfill from aligned property tables |
 | `20260318230000_finalize_property_cutover_and_legacy_cleanup.sql` | 2026-03-18 23:00 | **BREAKING:** Cut over `get_place_source_bundle` + `campsite_full` to aligned property tables; drop legacy source tables (`osm_source`, `place_llm_enrichments`, `place_google_sources`, `place_google_reviews`, `place_google_photos`); trim `places` business columns |
@@ -1144,7 +1132,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_current
 
 ## Last Updated
 
-2026-03-18
+2026-03-19
 
 ---
 
