@@ -533,82 +533,6 @@ export interface Database {
           created_at?: string | null
         }
       }
-      description_generation_jobs: {
-        Row: {
-          id: string
-          place_id: string
-          status: string | null
-          priority: number | null
-          attempts: number | null
-          error_message: string | null
-          created_at: string | null
-          updated_at: string | null
-          completed_at: string | null
-        }
-        Insert: {
-          id: string
-          place_id: string
-          status?: string | null
-          priority?: number | null
-          attempts?: number | null
-          error_message?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-          completed_at?: string | null
-        }
-        Update: {
-          id?: string
-          place_id?: string
-          status?: string | null
-          priority?: number | null
-          attempts?: number | null
-          error_message?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-          completed_at?: string | null
-        }
-      }
-      website_scraping_jobs: {
-        Row: {
-          id: string
-          place_id: string
-          website_url: string
-          status: string | null
-          priority: number | null
-          attempts: number | null
-          extracted_data: Json | null
-          error_message: string | null
-          created_at: string | null
-          updated_at: string | null
-          completed_at: string | null
-        }
-        Insert: {
-          id: string
-          place_id: string
-          website_url: string
-          status?: string | null
-          priority?: number | null
-          attempts?: number | null
-          extracted_data?: Json | null
-          error_message?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-          completed_at?: string | null
-        }
-        Update: {
-          id?: string
-          place_id?: string
-          website_url?: string
-          status?: string | null
-          priority?: number | null
-          attempts?: number | null
-          extracted_data?: Json | null
-          error_message?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-          completed_at?: string | null
-        }
-      }
       spatial_ref_sys: {
         Row: {
           srid: number
@@ -854,61 +778,6 @@ export interface Database {
           level?: string
           payload?: Json
           created_at?: string
-        }
-      }
-      cutover_metric_snapshots: {
-        Row: {
-          id: number
-          import_coverage_ratio: number
-          queue_backlog: number
-          job_failures_24h: number
-          freshness_stale_count: number
-          enrichment_spend_usd_24h: number
-          google_calls_24h: number
-          canonical_legacy_divergence: number
-          unresolved_mappings: number
-          created_at: string
-        }
-        Insert: {
-          id: number
-          import_coverage_ratio: number
-          queue_backlog: number
-          job_failures_24h: number
-          freshness_stale_count: number
-          enrichment_spend_usd_24h: number
-          google_calls_24h: number
-          canonical_legacy_divergence: number
-          unresolved_mappings: number
-          created_at: string
-        }
-        Update: {
-          id?: number
-          import_coverage_ratio?: number
-          queue_backlog?: number
-          job_failures_24h?: number
-          freshness_stale_count?: number
-          enrichment_spend_usd_24h?: number
-          google_calls_24h?: number
-          canonical_legacy_divergence?: number
-          unresolved_mappings?: number
-          created_at?: string
-        }
-      }
-      cutover_runtime_flags: {
-        Row: {
-          key: string
-          value: string
-          updated_at: string
-        }
-        Insert: {
-          key: string
-          value: string
-          updated_at: string
-        }
-        Update: {
-          key?: string
-          value?: string
-          updated_at?: string
         }
       }
       osm_import_jobs: {
@@ -1281,85 +1150,6 @@ export interface Database {
           updated_at?: string | null
         }
       }
-      import_snapshot: {
-        Row: {
-          id: string
-          region: string
-          source_name: string
-          source_pbf_date: string | null
-          source_state: string | null
-          imported_at: string
-          matched_count: number | null
-          created_count: number | null
-          stale_count: number | null
-          duplicate_candidates_count: number | null
-          error_count: number | null
-        }
-        Insert: {
-          id: string
-          region: string
-          source_name: string
-          source_pbf_date?: string | null
-          source_state?: string | null
-          imported_at: string
-          matched_count?: number | null
-          created_count?: number | null
-          stale_count?: number | null
-          duplicate_candidates_count?: number | null
-          error_count?: number | null
-        }
-        Update: {
-          id?: string
-          region?: string
-          source_name?: string
-          source_pbf_date?: string | null
-          source_state?: string | null
-          imported_at?: string
-          matched_count?: number | null
-          created_count?: number | null
-          stale_count?: number | null
-          duplicate_candidates_count?: number | null
-          error_count?: number | null
-        }
-      }
-      osm_type_transitions: {
-        Row: {
-          id: number
-          old_osm_type: string
-          old_osm_id: number
-          new_osm_type: string
-          new_osm_id: number
-          detected_at: string
-          transition_type: string | null
-          confidence: number | null
-          merge_decision: string | null
-          merged_place_id: number | null
-        }
-        Insert: {
-          id: number
-          old_osm_type: string
-          old_osm_id: number
-          new_osm_type: string
-          new_osm_id: number
-          detected_at: string
-          transition_type?: string | null
-          confidence?: number | null
-          merge_decision?: string | null
-          merged_place_id?: number | null
-        }
-        Update: {
-          id?: number
-          old_osm_type?: string
-          old_osm_id?: number
-          new_osm_type?: string
-          new_osm_id?: number
-          detected_at?: string
-          transition_type?: string | null
-          confidence?: number | null
-          merge_decision?: string | null
-          merged_place_id?: number | null
-        }
-      }
       place_duplicate_candidates: {
         Row: {
           id: number
@@ -1520,11 +1310,15 @@ export interface Database {
           has_visitor_center: boolean | null
           has_lockers: boolean | null
           photography_allowed: boolean | null
-          osm_source_id: number | null
           osm_id: number | null
           osm_type: string | null
           osm_version: number | null
           osm_timestamp: string | null
+          imported_at: string | null
+          first_seen_at: string | null
+          last_seen_at: string | null
+          last_import_run_id: number | null
+          source_metadata: Json | null
         }
         Insert: {
           id: number
@@ -1591,11 +1385,15 @@ export interface Database {
           has_visitor_center?: boolean | null
           has_lockers?: boolean | null
           photography_allowed?: boolean | null
-          osm_source_id?: number | null
           osm_id?: number | null
           osm_type?: string | null
           osm_version?: number | null
           osm_timestamp?: string | null
+          imported_at?: string | null
+          first_seen_at?: string | null
+          last_seen_at?: string | null
+          last_import_run_id?: number | null
+          source_metadata?: Json | null
         }
         Update: {
           id?: number
@@ -1662,11 +1460,15 @@ export interface Database {
           has_visitor_center?: boolean | null
           has_lockers?: boolean | null
           photography_allowed?: boolean | null
-          osm_source_id?: number | null
           osm_id?: number | null
           osm_type?: string | null
           osm_version?: number | null
           osm_timestamp?: string | null
+          imported_at?: string | null
+          first_seen_at?: string | null
+          last_seen_at?: string | null
+          last_import_run_id?: number | null
+          source_metadata?: Json | null
         }
       }
       place_google_properties: {
@@ -2306,80 +2108,6 @@ export interface Database {
           has_lockers?: boolean | null
           photography_allowed?: boolean | null
           user_id?: string
-        }
-      }
-      osm_source: {
-        Row: {
-          id: number
-          place_id: number
-          osm_type: string
-          osm_id: number
-          osm_version: number | null
-          tags: Json
-          raw_name: string | null
-          source_snapshot_date: string | null
-          imported_at: string
-          first_seen_at: string
-          last_seen_at: string
-          last_import_run_id: number | null
-          geometry_kind: string | null
-          geometry_hash: string | null
-          centroid: string | null
-          geom: string | null
-          osm_timestamp: string | null
-          osmium_unique_id: string | null
-          first_seen_snapshot_id: string | null
-          last_seen_snapshot_id: string | null
-          is_current: boolean
-          source_metadata: Json
-        }
-        Insert: {
-          id: number
-          place_id: number
-          osm_type: string
-          osm_id: number
-          osm_version?: number | null
-          tags: Json
-          raw_name?: string | null
-          source_snapshot_date?: string | null
-          imported_at: string
-          first_seen_at: string
-          last_seen_at: string
-          last_import_run_id?: number | null
-          geometry_kind?: string | null
-          geometry_hash?: string | null
-          centroid?: string | null
-          geom?: string | null
-          osm_timestamp?: string | null
-          osmium_unique_id?: string | null
-          first_seen_snapshot_id?: string | null
-          last_seen_snapshot_id?: string | null
-          is_current: boolean
-          source_metadata: Json
-        }
-        Update: {
-          id?: number
-          place_id?: number
-          osm_type?: string
-          osm_id?: number
-          osm_version?: number | null
-          tags?: Json
-          raw_name?: string | null
-          source_snapshot_date?: string | null
-          imported_at?: string
-          first_seen_at?: string
-          last_seen_at?: string
-          last_import_run_id?: number | null
-          geometry_kind?: string | null
-          geometry_hash?: string | null
-          centroid?: string | null
-          geom?: string | null
-          osm_timestamp?: string | null
-          osmium_unique_id?: string | null
-          first_seen_snapshot_id?: string | null
-          last_seen_snapshot_id?: string | null
-          is_current?: boolean
-          source_metadata?: Json
         }
       }
       place_google_reviews: {
