@@ -1,8 +1,8 @@
 # CamperPlaner Database Schema
 
 > **Location:** This is the canonical source of truth for the CamperPlaner database schema.
-> **Generated:** 2026-03-20
-> **Migration Head:** 20260320060000_drop_unused_job_import_and_cutover_tables.sql
+> **Generated:** 2026-03-21
+> **Migration Head:** 20260321000000_create_place_resolved_views.sql
 
 ---
 
@@ -13,7 +13,7 @@
 | **Total Tables** | 34 |
 | **User Tables** | 27 |
 | **System Tables** | 7 (PostGIS) |
-| **Views** | 6 |
+| **Views** | 8 |
 | **Enums** | 20 |
 | **RPC Functions** | 1 |
 
@@ -931,6 +931,43 @@ Aggregated price statistics.
 ### `campsite_api_read_model`
 Legacy read model alias (deprecated).
 
+### `place_resolved_public`
+Public-facing read model for list and detail queries. Merges the three non-user property tables (google, osm, llm) using per-column priority coalescing. Excludes user-scoped overrides.
+
+**Priority order:** google > osm > llm
+
+**Column groups:**
+- Core place identity: `id`, `geom`, `lat`, `lon`, `is_active`, `place_created_at`, `place_updated_at`
+- Identity/Content: `name`, `description`, `place_type`, `source_place_type`, `source_categories`
+- Address/Location: `country_code`, `region`, `city`, `postcode`, `address`, `source_lat`, `source_lon`
+- Contact/Operations: `website`, `phone`, `email`, `opening_hours`, `fee_info`
+- Generic Flags: `wheelchair_accessible`, `family_friendly`, `pets_allowed`, `indoor`, `outdoor`, `entry_fee_required`, `reservation_required`, `overnight_stay_allowed`
+- General Facilities: `has_parking`, `has_restrooms`, `has_drinking_water`, `has_wifi`, `has_shop`, `has_restaurant`, `has_cafe`
+- Camping Permissions: `caravan_allowed`, `motorhome_allowed`, `tent_allowed`
+- Camping Facilities: `has_electricity`, `has_fresh_water`, `has_shower`, `has_laundry`, `has_dishwashing_area`
+- Disposal/Utilities: `has_grey_water_disposal`, `has_black_water_disposal`, `has_chemical_toilet_disposal`, `has_dump_station`, `has_waste_disposal`, `has_recycling`
+- Leisure: `has_bbq_area`, `has_fire_pit`, `has_playground`, `has_pool`, `has_beach`
+- Nudism: `nudism_allowed`, `nudism_only`
+- Attraction/Museum: `has_guided_tours`, `has_audio_guide`, `has_visitor_center`, `has_lockers`, `photography_allowed`
+- Source tracking: `has_osm`, `has_google`, `has_llm`, `name_source`
+- Timestamps: `osm_updated_at`, `google_updated_at`, `llm_updated_at`, `osm_source_updated_at`, `google_source_updated_at`, `llm_source_updated_at`
+
+Canonical coordinates (`lat`, `lon`, `geom`) come from the `places` table. Whitespace-only strings are treated as NULL. Uses LATERAL joins to fetch current-row property data from each source table.
+
+### `place_resolved_my`
+Authenticated-user read model for list and detail queries. Same column structure as `place_resolved_public` but inserts the current authenticated user's `place_user_properties` into the priority chain.
+
+**Priority order:** google > user > osm > llm
+
+User override is determined by `auth.uid()`. If no user is authenticated, falls back to google > osm > llm (same result as `place_resolved_public`).
+
+Additional columns beyond `place_resolved_public`:
+- `has_user` (boolean): whether the current user has submitted a property override for this place
+- `user_updated_at` (timestamptz): when the user's override was last updated
+- `user_source_updated_at` (timestamptz): source timestamp from the user's override row
+
+Use for rendering place data that should reflect the authenticated user's personal corrections or additions.
+
 ---
 
 ## Enums
@@ -1092,6 +1129,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_unique
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260321000000_create_place_resolved_views.sql` | 2026-03-21 00:00 | Add `place_resolved_public` (google > osm > llm priority) and `place_resolved_my` (google > user > osm > llm priority via auth.uid()) views for public and authenticated place list/detail queries |
 | `20260320060000_drop_unused_job_import_and_cutover_tables.sql` | 2026-03-20 06:00 | **BREAKING:** Add/backfill OSM provenance fields on `place_osm_properties`, drop `place_osm_properties.osm_source_id`, drop `osm_source`, and remove unused job/import/cutover tables (`description_generation_jobs`, `website_scraping_jobs`, `osm_type_transitions`, `import_snapshot`, `cutover_runtime_flags`, `cutover_metric_snapshots`) |
 | `20260319100000_enforce_single_row_per_place_in_property_tables.sql` | 2026-03-19 10:00 | Deduplicate `place_osm_properties`/`place_google_properties`/`place_llm_properties`; enforce strict unique `place_id` cardinality (1 row per place) |
 | `20260319083000_drop_llm_enrichments_and_google_sources.sql` | 2026-03-19 08:30 | Rekey `place_google_reviews`/`place_google_photos` to `place_google_properties` via `google_property_id`; drop `place_google_sources` and `place_llm_enrichments` |
@@ -1132,7 +1170,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_unique
 
 ## Last Updated
 
-2026-03-19
+2026-03-21
 
 ---
 
