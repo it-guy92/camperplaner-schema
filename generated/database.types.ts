@@ -1761,6 +1761,9 @@ export interface Database {
           summary_de: string | null
           trust_score: number | null
           source_urls: Json | null
+          last_enriched_at: string | null
+          coverage_score: number | null
+          last_worker_id: string | null
         }
         Insert: {
           id: number
@@ -1833,6 +1836,9 @@ export interface Database {
           summary_de?: string | null
           trust_score?: number | null
           source_urls?: Json | null
+          last_enriched_at?: string | null
+          coverage_score?: number | null
+          last_worker_id?: string | null
         }
         Update: {
           id?: number
@@ -1905,6 +1911,9 @@ export interface Database {
           summary_de?: string | null
           trust_score?: number | null
           source_urls?: Json | null
+          last_enriched_at?: string | null
+          coverage_score?: number | null
+          last_worker_id?: string | null
         }
       }
       place_user_properties: {
@@ -2178,6 +2187,138 @@ export interface Database {
           google_photo_id?: string | null
           created_at?: string
           google_property_id?: number
+        }
+      }
+      worker_control: {
+        Row: {
+          worker_id: string
+          registered_at: string
+          last_seen_at: string
+          status_desired: string
+          status_actual: string
+          desired_concurrency: number
+          current_jobs: number
+          current_ip: string | null
+          cpu_pct: number | null
+          ram_pct: number | null
+          disk_pct: number | null
+          hostname: string | null
+          version: string | null
+          last_error_message: string | null
+          desired_updated_at: string | null
+          desired_updated_by: string | null
+          stats_updated_at: string
+        }
+        Insert: {
+          worker_id: string
+          registered_at: string
+          last_seen_at: string
+          status_desired: string
+          status_actual: string
+          desired_concurrency: number
+          current_jobs: number
+          current_ip?: string | null
+          cpu_pct?: number | null
+          ram_pct?: number | null
+          disk_pct?: number | null
+          hostname?: string | null
+          version?: string | null
+          last_error_message?: string | null
+          desired_updated_at?: string | null
+          desired_updated_by?: string | null
+          stats_updated_at: string
+        }
+        Update: {
+          worker_id?: string
+          registered_at?: string
+          last_seen_at?: string
+          status_desired?: string
+          status_actual?: string
+          desired_concurrency?: number
+          current_jobs?: number
+          current_ip?: string | null
+          cpu_pct?: number | null
+          ram_pct?: number | null
+          disk_pct?: number | null
+          hostname?: string | null
+          version?: string | null
+          last_error_message?: string | null
+          desired_updated_at?: string | null
+          desired_updated_by?: string | null
+          stats_updated_at?: string
+        }
+      }
+      worker_llm_usage: {
+        Row: {
+          bucket_start: string
+          worker_id: string
+          input_tokens: number
+          output_tokens: number
+          request_count: number
+          success_count: number
+          failure_count: number
+        }
+        Insert: {
+          bucket_start: string
+          worker_id: string
+          input_tokens: number
+          output_tokens: number
+          request_count: number
+          success_count: number
+          failure_count: number
+        }
+        Update: {
+          bucket_start?: string
+          worker_id?: string
+          input_tokens?: number
+          output_tokens?: number
+          request_count?: number
+          success_count?: number
+          failure_count?: number
+        }
+      }
+      place_llm_enrichment_state: {
+        Row: {
+          place_id: number
+          status: string
+          claimed_by_worker_id: string | null
+          claim_token: string | null
+          claim_expires_at: string | null
+          attempt_count: number
+          last_attempt_at: string | null
+          last_succeeded_at: string | null
+          next_retry_at: string | null
+          last_error_classification: string | null
+          last_error_message: string | null
+          updated_at: string
+        }
+        Insert: {
+          place_id: number
+          status: string
+          claimed_by_worker_id?: string | null
+          claim_token?: string | null
+          claim_expires_at?: string | null
+          attempt_count: number
+          last_attempt_at?: string | null
+          last_succeeded_at?: string | null
+          next_retry_at?: string | null
+          last_error_classification?: string | null
+          last_error_message?: string | null
+          updated_at: string
+        }
+        Update: {
+          place_id?: number
+          status?: string
+          claimed_by_worker_id?: string | null
+          claim_token?: string | null
+          claim_expires_at?: string | null
+          attempt_count?: number
+          last_attempt_at?: string | null
+          last_succeeded_at?: string | null
+          next_retry_at?: string | null
+          last_error_classification?: string | null
+          last_error_message?: string | null
+          updated_at?: string
         }
       }
     }
