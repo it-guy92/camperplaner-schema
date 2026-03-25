@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "0.0.1",
-  "schema_hash": "93cd410947292cd26749c12f6e786fdb3bf923ef774bc55e4610c312d70f1ae1",
-  "generated_at": "2026-03-25T13:03:51Z",
+  "schema_hash": "fda6c608a47aa3341caa37b578f7b9e7bcfa784124c06096a30436862e44df29",
+  "generated_at": "2026-03-25T15:02:42Z",
   "description": "Pinned artifact record - generated from schema migrations",
   "artifacts": [
     {
@@ -12,7 +12,7 @@
       "source_repository": "https://github.com/it-guy92/camperplaner-schema",
       "target_product": "apps/web/src/lib/database.types.ts",
       "target_worker": "src/types/database.types.ts",
-      "checksum": "93cd410947292cd26749c12f6e786fdb3bf923ef774bc55e4610c312d70f1ae1",
+      "checksum": "fda6c608a47aa3341caa37b578f7b9e7bcfa784124c06096a30436862e44df29",
       "status": "generated"
     }
   ],
