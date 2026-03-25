@@ -26,10 +26,17 @@ Short, actionable summary of the full audit in `docs/database-access-audit.md`.
   - Classification: `KEEP_ACTIVE`
 
 - Legacy runtime references removed from product/worker code:
-  - `campsites` runtime calls migrated to current tables (`campsites_cache` / `places`)
+  - `campsites` runtime calls migrated to current tables (`campsites_cache` / `places` / `campsite_full` / `place_resolved_public`)
   - `place_legacy_id_map` runtime alias resolution removed
   - `osm_refresh_queue` migrated to `osm_refresh_jobs`
   - `country_sequence_state` migrated to `app_settings` JSON state keys (`geofabrik_sequence_<COUNTRY>`)
+
+- Legacy campsite compatibility objects removed in migration `20260325100000_drop_legacy_campsites_objects.sql`
+  - Drops `campsites`
+  - Drops orphaned `place_legacy_id_map`
+  - Removes deprecated `campsite_api_read_model`
+  - Drops unused `campsites_cache.campsite_id`
+  - Keeps `trip_stops.campsite_id` as a compatibility alias until consumers rename it
 
 - `osm_source` is decommissioned in migration `20260320060000_drop_unused_job_import_and_cutover_tables.sql`
   - Selected provenance fields move to `place_osm_properties`

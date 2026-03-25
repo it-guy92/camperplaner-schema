@@ -928,9 +928,6 @@ Aggregated price statistics.
 | `avg_rating` | numeric | Average rating |
 | `review_count` | bigint | Review count |
 
-### `campsite_api_read_model`
-Legacy read model alias (deprecated).
-
 ### `place_resolved_public`
 Public-facing read model for list and detail queries. Merges the three non-user property tables (google, osm, llm) using per-column priority coalescing. Excludes user-scoped overrides.
 
@@ -1129,6 +1126,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_unique
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260325100000_drop_legacy_campsites_objects.sql` | 2026-03-25 10:00 | **BREAKING:** Drop legacy `campsites` table, remove deprecated `campsite_api_read_model` alias, drop orphaned `place_legacy_id_map`, and remove the unused `campsites_cache.campsite_id` back-reference |
 | `20260321000000_create_place_resolved_views.sql` | 2026-03-21 00:00 | Add `place_resolved_public` (google > osm > llm priority) and `place_resolved_my` (google > user > osm > llm priority via auth.uid()) views for public and authenticated place list/detail queries |
 | `20260320060000_drop_unused_job_import_and_cutover_tables.sql` | 2026-03-20 06:00 | **BREAKING:** Add/backfill OSM provenance fields on `place_osm_properties`, drop `place_osm_properties.osm_source_id`, drop `osm_source`, and remove unused job/import/cutover tables (`description_generation_jobs`, `website_scraping_jobs`, `osm_type_transitions`, `import_snapshot`, `cutover_runtime_flags`, `cutover_metric_snapshots`) |
 | `20260319100000_enforce_single_row_per_place_in_property_tables.sql` | 2026-03-19 10:00 | Deduplicate `place_osm_properties`/`place_google_properties`/`place_llm_properties`; enforce strict unique `place_id` cardinality (1 row per place) |
@@ -1170,7 +1168,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_unique
 
 ## Last Updated
 
-2026-03-21
+2026-03-25
 
 ---
 

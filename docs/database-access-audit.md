@@ -38,12 +38,15 @@
 
 ### `place_legacy_id_map`
 - Zweck: Legacy place ID mapping object.
+- Status in this repo: Dropped by migration `20260325100000_drop_legacy_campsites_objects.sql`.
 - Product runtime readers/writers: none.
-- Note: Worker references may still exist and must be handled in `camperplaner-worker`.
+- Note: Remaining worker references are test-only drift checks.
 
 ### `campsites`
 - Zweck: Legacy table name retained in historical docs/migrations.
-- Product runtime readers/writers: none (product runtime uses `campsites_cache`, `campsite_full`, and `campsite_api_read_model`).
+- Status in this repo: Dropped by migration `20260325100000_drop_legacy_campsites_objects.sql`.
+- Product runtime readers/writers: none (product runtime uses `campsites_cache`, `campsite_full`, and `place_resolved_public`).
+- Note: `trip_stops.campsite_id` remains as a compatibility column, but no longer references `public.campsites`.
 
 ## Non-public System Catalog References
 
@@ -1574,11 +1577,9 @@
 ## Views
 
 ### `campsite_api_read_model`
-- Zweck: View that exposes the canonical place model in an API-friendly campsite shape.
-- Runtime readers:
-  - product/runtime camperplaner-product/apps/web/src/app/api/admin/cutover/metrics/route.ts#supabase
-- Runtime writers:
-  - none
+- Zweck: Deprecated campsite read-model alias.
+- Status in this repo: Dropped by migration `20260325100000_drop_legacy_campsites_objects.sql`.
+- Replacement: use `campsite_full` for the legacy-compatible shape and `place_resolved_public` for canonical public reads.
 
 ### `campsite_full`
 - Zweck: View that combines canonical place data with enrichment/cache fields for detail reads.
