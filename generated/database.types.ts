@@ -2588,66 +2588,6 @@ export interface Database {
           review_count: number | null
         }
       }
-      campsite_api_read_model: {
-        Row: {
-          place_id: string | null
-          name: string | null
-          location: string | null
-          lat: number | null
-          lng: number | null
-          source_type: string | null
-          osm_id: string | null
-          osm_tags: Json | null
-          website: string | null
-          opening_hours: string | null
-          contact_phone: string | null
-          contact_email: string | null
-          scraped_website_url: string | null
-          scraped_at: string | null
-          scraped_price_info: Json | null
-          scraped_data_source: string | null
-          description: string | null
-          description_source: string | null
-          description_generated_at: string | null
-          description_version: number | null
-          estimated_price: number | null
-          price_source: string | null
-          user_price_count: number | null
-          user_price_avg: number | null
-          place_types: unknown[] | null
-          created_at: string | null
-          updated_at: string | null
-          google_place_id: string | null
-          google_photos: Json | null
-          google_reviews: Json | null
-          google_data_fetched_at: string | null
-          google_data_expires_at: string | null
-          google_data_expired: boolean | null
-          review_count: number | null
-          avg_rating: number | null
-          user_price_entries: number | null
-          favorite_count: number | null
-          google_rating: number | null
-          rating: number | null
-          type: string | null
-          has_toilet: boolean | null
-          has_shower: boolean | null
-          has_electricity: boolean | null
-          has_dogs_allowed: boolean | null
-          has_wifi: boolean | null
-          has_beach: boolean | null
-          has_laundry: boolean | null
-          has_restaurant: boolean | null
-          has_bar: boolean | null
-          has_shop: boolean | null
-          has_pool: boolean | null
-          has_playground: boolean | null
-          has_dump_station: boolean | null
-          has_water: boolean | null
-          has_washing_machine: boolean | null
-          has_dishwasher: boolean | null
-        }
-      }
     }
     Functions: {
       [_ in never]: never
