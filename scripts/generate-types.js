@@ -15,13 +15,16 @@ if (fs.existsSync(envPath)) {
 
 const PROJECT_REF = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/)?.[1];
 const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD;
+const DB_HOST = process.env.SUPABASE_DB_HOST || (PROJECT_REF ? `db.${PROJECT_REF}.supabase.co` : null);
+const DB_PORT = process.env.SUPABASE_DB_PORT || '5432';
+const DB_SSLMODE = process.env.SUPABASE_DB_SSLMODE || (DB_HOST?.endsWith('.supabase.co') ? 'require' : 'disable');
 
-if (!PROJECT_REF || !DB_PASSWORD) {
-  console.error('Error: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_DB_PASSWORD must be set in .env.local');
+if (!DB_HOST || !DB_PASSWORD) {
+  console.error('Error: set SUPABASE_DB_PASSWORD and either SUPABASE_DB_HOST or a Supabase Cloud NEXT_PUBLIC_SUPABASE_URL in .env.local');
   process.exit(1);
 }
 
-const connectionString = `postgresql://postgres:${DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
+const connectionString = `postgresql://postgres:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/postgres?sslmode=${DB_SSLMODE}`;
 
 console.log('Connecting to database...');
 
