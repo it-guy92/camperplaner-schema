@@ -13,18 +13,47 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const PROJECT_REF = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/)?.[1];
 const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD;
-const DB_HOST = process.env.SUPABASE_DB_HOST || (PROJECT_REF ? `db.${PROJECT_REF}.supabase.co` : null);
 const DB_PORT = process.env.SUPABASE_DB_PORT || '5432';
+const DB_NAME = process.env.SUPABASE_DB_NAME || 'postgres';
+const DB_USER = process.env.SUPABASE_DB_USER || 'postgres';
+const DIRECT_DB_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+
+function inferDbHostFromApiUrl(apiUrl) {
+  if (!apiUrl) return null;
+
+  try {
+    const { hostname } = new URL(apiUrl);
+    const supabaseRefMatch = hostname.match(/^([a-z0-9-]+)\.supabase\.co$/i);
+
+    if (supabaseRefMatch) {
+      return `db.${supabaseRefMatch[1]}.supabase.co`;
+    }
+
+    return `db.${hostname}`;
+  } catch {
+    return null;
+  }
+}
+
+const DB_HOST = process.env.SUPABASE_DB_HOST || inferDbHostFromApiUrl(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
 const DB_SSLMODE = process.env.SUPABASE_DB_SSLMODE || (DB_HOST?.endsWith('.supabase.co') ? 'require' : 'disable');
 
-if (!DB_HOST || !DB_PASSWORD) {
-  console.error('Error: set SUPABASE_DB_PASSWORD and either SUPABASE_DB_HOST or a Supabase Cloud NEXT_PUBLIC_SUPABASE_URL in .env.local');
+if (!DB_PASSWORD) {
+  console.error('Error: SUPABASE_DB_PASSWORD must be set in .env.local');
   process.exit(1);
 }
 
-const connectionString = `postgresql://postgres:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/postgres?sslmode=${DB_SSLMODE}`;
+const connectionString = DIRECT_DB_URL
+  ? DIRECT_DB_URL
+  : DB_HOST
+    ? `postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}`
+    : null;
+
+if (!connectionString) {
+  console.error('Error: set SUPABASE_DB_URL/DATABASE_URL or SUPABASE_DB_HOST (or a valid SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL) together with SUPABASE_DB_PASSWORD');
+  process.exit(1);
+}
 
 console.log('Connecting to database...');
 

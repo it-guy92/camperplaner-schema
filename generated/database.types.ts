@@ -42,6 +42,8 @@ export type OneTimeTokenType = 'confirmation_token' | 'reauthentication_token' |
 
 export type Buckettype = 'STANDARD' | 'ANALYTICS' | 'VECTOR'
 
+export type CanonicalPlaceTypeEnum = 'campsite' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction' | 'museum' | 'viewpoint' | 'beach' | 'castle' | 'marina' | 'restaurant' | 'shop' | 'nature_spot' | 'poi'
+
 export interface Database {
   public: {
     Tables: {
@@ -558,6 +560,7 @@ export interface Database {
           review_count: number | null
           business_status: string | null
           expires_at: string | null
+          canonical_place_type: string
         }
         Insert: {
           id: number
@@ -630,6 +633,7 @@ export interface Database {
           review_count?: number | null
           business_status?: string | null
           expires_at?: string | null
+          canonical_place_type: string
         }
         Update: {
           id?: number
@@ -702,6 +706,7 @@ export interface Database {
           review_count?: number | null
           business_status?: string | null
           expires_at?: string | null
+          canonical_place_type?: string
         }
       }
       place_llm_properties: {
@@ -779,6 +784,7 @@ export interface Database {
           last_enriched_at: string | null
           coverage_score: number | null
           last_worker_id: string | null
+          canonical_place_type: string
         }
         Insert: {
           id: number
@@ -854,6 +860,7 @@ export interface Database {
           last_enriched_at?: string | null
           coverage_score?: number | null
           last_worker_id?: string | null
+          canonical_place_type: string
         }
         Update: {
           id?: number
@@ -929,6 +936,7 @@ export interface Database {
           last_enriched_at?: string | null
           coverage_score?: number | null
           last_worker_id?: string | null
+          canonical_place_type?: string
         }
       }
       place_osm_properties: {
@@ -1006,6 +1014,7 @@ export interface Database {
           last_seen_at: string | null
           last_import_run_id: number | null
           source_metadata: Json | null
+          canonical_place_type: string
         }
         Insert: {
           id: number
@@ -1081,6 +1090,7 @@ export interface Database {
           last_seen_at?: string | null
           last_import_run_id?: number | null
           source_metadata?: Json | null
+          canonical_place_type: string
         }
         Update: {
           id?: number
@@ -1156,6 +1166,7 @@ export interface Database {
           last_seen_at?: string | null
           last_import_run_id?: number | null
           source_metadata?: Json | null
+          canonical_place_type?: string
         }
       }
       places: {
@@ -1838,6 +1849,7 @@ export interface Database {
           has_lockers: boolean | null
           photography_allowed: boolean | null
           user_id: string
+          canonical_place_type: string
         }
         Insert: {
           id: number
@@ -1905,6 +1917,7 @@ export interface Database {
           has_lockers?: boolean | null
           photography_allowed?: boolean | null
           user_id: string
+          canonical_place_type: string
         }
         Update: {
           id?: number
@@ -1972,6 +1985,7 @@ export interface Database {
           has_lockers?: boolean | null
           photography_allowed?: boolean | null
           user_id?: string
+          canonical_place_type?: string
         }
       }
       profiles: {
@@ -2401,66 +2415,6 @@ export interface Database {
           has_dishwasher: boolean | null
         }
       }
-      campsite_api_read_model: {
-        Row: {
-          place_id: string | null
-          name: string | null
-          location: string | null
-          lat: number | null
-          lng: number | null
-          source_type: string | null
-          osm_id: string | null
-          osm_tags: Json | null
-          website: string | null
-          opening_hours: string | null
-          contact_phone: string | null
-          contact_email: string | null
-          scraped_website_url: string | null
-          scraped_at: string | null
-          scraped_price_info: Json | null
-          scraped_data_source: string | null
-          description: string | null
-          description_source: string | null
-          description_generated_at: string | null
-          description_version: number | null
-          estimated_price: number | null
-          price_source: string | null
-          user_price_count: number | null
-          user_price_avg: number | null
-          place_types: unknown[] | null
-          created_at: string | null
-          updated_at: string | null
-          google_place_id: string | null
-          google_photos: Json | null
-          google_reviews: Json | null
-          google_data_fetched_at: string | null
-          google_data_expires_at: string | null
-          google_data_expired: boolean | null
-          review_count: number | null
-          avg_rating: number | null
-          user_price_entries: number | null
-          favorite_count: number | null
-          google_rating: number | null
-          rating: number | null
-          type: string | null
-          has_toilet: boolean | null
-          has_shower: boolean | null
-          has_electricity: boolean | null
-          has_dogs_allowed: boolean | null
-          has_wifi: boolean | null
-          has_beach: boolean | null
-          has_laundry: boolean | null
-          has_restaurant: boolean | null
-          has_bar: boolean | null
-          has_shop: boolean | null
-          has_pool: boolean | null
-          has_playground: boolean | null
-          has_dump_station: boolean | null
-          has_water: boolean | null
-          has_washing_machine: boolean | null
-          has_dishwasher: boolean | null
-        }
-      }
       campsite_price_summary: {
         Row: {
           place_id: string | null
@@ -2481,6 +2435,85 @@ export interface Database {
           avg_rating: number | null
           min_rating: number | null
           max_rating: number | null
+        }
+      }
+      place_resolved_public: {
+        Row: {
+          id: number | null
+          geom: string | null
+          lat: number | null
+          lon: number | null
+          is_active: boolean | null
+          place_created_at: string | null
+          place_updated_at: string | null
+          name: string | null
+          description: string | null
+          place_type: string | null
+          source_place_type: string | null
+          source_categories: unknown[] | null
+          country_code: string | null
+          region: string | null
+          city: string | null
+          postcode: string | null
+          address: string | null
+          source_lat: number | null
+          source_lon: number | null
+          website: string | null
+          phone: string | null
+          email: string | null
+          opening_hours: string | null
+          fee_info: string | null
+          wheelchair_accessible: boolean | null
+          family_friendly: boolean | null
+          pets_allowed: boolean | null
+          indoor: boolean | null
+          outdoor: boolean | null
+          entry_fee_required: boolean | null
+          reservation_required: boolean | null
+          overnight_stay_allowed: boolean | null
+          has_parking: boolean | null
+          has_restrooms: boolean | null
+          has_drinking_water: boolean | null
+          has_wifi: boolean | null
+          has_shop: boolean | null
+          has_restaurant: boolean | null
+          has_cafe: boolean | null
+          caravan_allowed: boolean | null
+          motorhome_allowed: boolean | null
+          tent_allowed: boolean | null
+          has_electricity: boolean | null
+          has_fresh_water: boolean | null
+          has_shower: boolean | null
+          has_laundry: boolean | null
+          has_dishwashing_area: boolean | null
+          has_grey_water_disposal: boolean | null
+          has_black_water_disposal: boolean | null
+          has_chemical_toilet_disposal: boolean | null
+          has_dump_station: boolean | null
+          has_waste_disposal: boolean | null
+          has_recycling: boolean | null
+          has_bbq_area: boolean | null
+          has_fire_pit: boolean | null
+          has_playground: boolean | null
+          has_pool: boolean | null
+          has_beach: boolean | null
+          nudism_allowed: boolean | null
+          nudism_only: boolean | null
+          has_guided_tours: boolean | null
+          has_audio_guide: boolean | null
+          has_visitor_center: boolean | null
+          has_lockers: boolean | null
+          photography_allowed: boolean | null
+          has_osm: boolean | null
+          has_google: boolean | null
+          has_llm: boolean | null
+          name_source: string | null
+          osm_updated_at: string | null
+          google_updated_at: string | null
+          llm_updated_at: string | null
+          osm_source_updated_at: string | null
+          google_source_updated_at: string | null
+          llm_source_updated_at: string | null
         }
       }
       place_resolved_my: {
@@ -2565,85 +2598,6 @@ export interface Database {
           user_source_updated_at: string | null
         }
       }
-      place_resolved_public: {
-        Row: {
-          id: number | null
-          geom: string | null
-          lat: number | null
-          lon: number | null
-          is_active: boolean | null
-          place_created_at: string | null
-          place_updated_at: string | null
-          name: string | null
-          description: string | null
-          place_type: string | null
-          source_place_type: string | null
-          source_categories: unknown[] | null
-          country_code: string | null
-          region: string | null
-          city: string | null
-          postcode: string | null
-          address: string | null
-          source_lat: number | null
-          source_lon: number | null
-          website: string | null
-          phone: string | null
-          email: string | null
-          opening_hours: string | null
-          fee_info: string | null
-          wheelchair_accessible: boolean | null
-          family_friendly: boolean | null
-          pets_allowed: boolean | null
-          indoor: boolean | null
-          outdoor: boolean | null
-          entry_fee_required: boolean | null
-          reservation_required: boolean | null
-          overnight_stay_allowed: boolean | null
-          has_parking: boolean | null
-          has_restrooms: boolean | null
-          has_drinking_water: boolean | null
-          has_wifi: boolean | null
-          has_shop: boolean | null
-          has_restaurant: boolean | null
-          has_cafe: boolean | null
-          caravan_allowed: boolean | null
-          motorhome_allowed: boolean | null
-          tent_allowed: boolean | null
-          has_electricity: boolean | null
-          has_fresh_water: boolean | null
-          has_shower: boolean | null
-          has_laundry: boolean | null
-          has_dishwashing_area: boolean | null
-          has_grey_water_disposal: boolean | null
-          has_black_water_disposal: boolean | null
-          has_chemical_toilet_disposal: boolean | null
-          has_dump_station: boolean | null
-          has_waste_disposal: boolean | null
-          has_recycling: boolean | null
-          has_bbq_area: boolean | null
-          has_fire_pit: boolean | null
-          has_playground: boolean | null
-          has_pool: boolean | null
-          has_beach: boolean | null
-          nudism_allowed: boolean | null
-          nudism_only: boolean | null
-          has_guided_tours: boolean | null
-          has_audio_guide: boolean | null
-          has_visitor_center: boolean | null
-          has_lockers: boolean | null
-          photography_allowed: boolean | null
-          has_osm: boolean | null
-          has_google: boolean | null
-          has_llm: boolean | null
-          name_source: string | null
-          osm_updated_at: string | null
-          google_updated_at: string | null
-          llm_updated_at: string | null
-          osm_source_updated_at: string | null
-          google_source_updated_at: string | null
-          llm_source_updated_at: string | null
-        }
-      }
     }
     Functions: {
       [_ in never]: never
@@ -2667,6 +2621,7 @@ export interface Database {
       oauth_response_type: 'code'
       one_time_token_type: 'confirmation_token' | 'reauthentication_token' | 'recovery_token' | 'email_change_token_new' | 'email_change_token_current' | 'phone_change_token'
       buckettype: 'STANDARD' | 'ANALYTICS' | 'VECTOR'
+      canonical_place_type_enum: 'campsite' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction' | 'museum' | 'viewpoint' | 'beach' | 'castle' | 'marina' | 'restaurant' | 'shop' | 'nature_spot' | 'poi'
     }
   }
 }
