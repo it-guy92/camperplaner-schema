@@ -112,4 +112,5 @@ For existing schema artifacts in product repo:
 
 ---
 
-**Last Updated:** 2026-03-18
+**Latest migration reference:** `20260326090000_create_place_media_assets.sql`
+**Last Updated:** 2026-03-26

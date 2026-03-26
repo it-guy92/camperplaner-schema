@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "0.0.1",
   "schema_hash": "TBD",
-  "generated_at": "2026-03-25T21:45:00Z",
+  "generated_at": "2026-03-26T09:00:00Z",
   "description": "Pinned artifact record - generated from schema migrations",
   "artifacts": [
     {
@@ -17,8 +17,8 @@
     }
   ],
   "migrations": {
-    "latest": "20260325214500",
-    "count": 45,
+    "latest": "20260326090000",
+    "count": 46,
     "pending_transfer": []
   },
   "contract_version": "1.0.0"
