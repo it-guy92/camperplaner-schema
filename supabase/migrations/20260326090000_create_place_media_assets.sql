@@ -162,6 +162,12 @@ CREATE INDEX IF NOT EXISTS idx_place_media_assets_mapillary
     ON public.place_media_assets(place_id, source, distance_to_place_meters)
     WHERE source = 'mapillary';
 
+DROP TRIGGER IF EXISTS trg_place_media_assets_updated_at ON public.place_media_assets;
+CREATE TRIGGER trg_place_media_assets_updated_at
+    BEFORE UPDATE ON public.place_media_assets
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 ALTER TABLE public.place_media_assets ENABLE ROW LEVEL SECURITY;
 
 DO $$

@@ -44,6 +44,12 @@ export type Buckettype = 'STANDARD' | 'ANALYTICS' | 'VECTOR'
 
 export type CanonicalPlaceTypeEnum = 'campsite' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction' | 'museum' | 'viewpoint' | 'beach' | 'castle' | 'marina' | 'restaurant' | 'shop' | 'nature_spot' | 'poi'
 
+export type MediaSourceEnum = 'own' | 'wikimedia' | 'mapillary'
+
+export type MediaReviewStatusEnum = 'pending' | 'approved' | 'rejected'
+
+export type MediaVisibilityStatusEnum = 'internal' | 'public'
+
 export interface Database {
   public: {
     Tables: {
@@ -2331,6 +2337,134 @@ export interface Database {
           failure_count?: number
         }
       }
+      place_media_assets: {
+        Row: {
+          id: number
+          place_id: number
+          source: string
+          source_asset_id: string | null
+          review_status: string
+          visibility_status: string
+          is_hero: boolean
+          sort_order: number
+          title: string | null
+          caption: string | null
+          author_name: string | null
+          license_type: string | null
+          license_url: string | null
+          attribution_text: string | null
+          source_url: string | null
+          viewer_url: string | null
+          thumbnail_url: string | null
+          storage_bucket: string | null
+          storage_object_path: string | null
+          storage_original_filename: string | null
+          mime_type: string | null
+          byte_size: number | null
+          width: number | null
+          height: number | null
+          captured_at: string | null
+          imported_at: string
+          lat: number | null
+          lon: number | null
+          distance_to_place_meters: number | null
+          match_confidence: number | null
+          uploaded_by_user_id: string | null
+          rights_confirmed_at: string | null
+          rights_snapshot_version: string | null
+          reviewed_by_user_id: string | null
+          reviewed_at: string | null
+          review_reason_code: string | null
+          review_notes: string | null
+          source_metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          place_id: number
+          source: string
+          source_asset_id?: string | null
+          review_status: string
+          visibility_status: string
+          is_hero: boolean
+          sort_order: number
+          title?: string | null
+          caption?: string | null
+          author_name?: string | null
+          license_type?: string | null
+          license_url?: string | null
+          attribution_text?: string | null
+          source_url?: string | null
+          viewer_url?: string | null
+          thumbnail_url?: string | null
+          storage_bucket?: string | null
+          storage_object_path?: string | null
+          storage_original_filename?: string | null
+          mime_type?: string | null
+          byte_size?: number | null
+          width?: number | null
+          height?: number | null
+          captured_at?: string | null
+          imported_at: string
+          lat?: number | null
+          lon?: number | null
+          distance_to_place_meters?: number | null
+          match_confidence?: number | null
+          uploaded_by_user_id?: string | null
+          rights_confirmed_at?: string | null
+          rights_snapshot_version?: string | null
+          reviewed_by_user_id?: string | null
+          reviewed_at?: string | null
+          review_reason_code?: string | null
+          review_notes?: string | null
+          source_metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: number
+          place_id?: number
+          source?: string
+          source_asset_id?: string | null
+          review_status?: string
+          visibility_status?: string
+          is_hero?: boolean
+          sort_order?: number
+          title?: string | null
+          caption?: string | null
+          author_name?: string | null
+          license_type?: string | null
+          license_url?: string | null
+          attribution_text?: string | null
+          source_url?: string | null
+          viewer_url?: string | null
+          thumbnail_url?: string | null
+          storage_bucket?: string | null
+          storage_object_path?: string | null
+          storage_original_filename?: string | null
+          mime_type?: string | null
+          byte_size?: number | null
+          width?: number | null
+          height?: number | null
+          captured_at?: string | null
+          imported_at?: string
+          lat?: number | null
+          lon?: number | null
+          distance_to_place_meters?: number | null
+          match_confidence?: number | null
+          uploaded_by_user_id?: string | null
+          rights_confirmed_at?: string | null
+          rights_snapshot_version?: string | null
+          reviewed_by_user_id?: string | null
+          reviewed_at?: string | null
+          review_reason_code?: string | null
+          review_notes?: string | null
+          source_metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       geography_columns: {
@@ -2622,6 +2756,9 @@ export interface Database {
       one_time_token_type: 'confirmation_token' | 'reauthentication_token' | 'recovery_token' | 'email_change_token_new' | 'email_change_token_current' | 'phone_change_token'
       buckettype: 'STANDARD' | 'ANALYTICS' | 'VECTOR'
       canonical_place_type_enum: 'campsite' | 'camper_stop' | 'overnight_parking' | 'parking' | 'attraction' | 'museum' | 'viewpoint' | 'beach' | 'castle' | 'marina' | 'restaurant' | 'shop' | 'nature_spot' | 'poi'
+      media_source_enum: 'own' | 'wikimedia' | 'mapillary'
+      media_review_status_enum: 'pending' | 'approved' | 'rejected'
+      media_visibility_status_enum: 'internal' | 'public'
     }
   }
 }
