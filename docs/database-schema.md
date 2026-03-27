@@ -982,38 +982,6 @@ Use for rendering place data that should reflect the authenticated user's person
 
 ---
 
-## RPC Functions
-
-### `get_place_source_bundle(bigint)` → jsonb
-
-Returns a complete source bundle for a place by its bigint id.
-
-**Parameters:**
-- `place_id` (bigint): The place ID from the `places` table
-
-**Returns:** JSONB object with structure:
-```json
-{
-  "base": { /* places table row */ },
-  "osm": { /* current place_osm_properties row or null */ },
-  "llm": { /* current place_llm_properties row or null */ },
-  "google": { /* current place_google_properties row or null */ },
-  "user": [ /* current place_user_properties rows */ ],
-  "user_aggregates": {
-    "review_count": 0,
-    "avg_rating": null,
-    "favorite_count": 0
-  }
-}
-```
-
-**Behavior:**
-- Returns `NULL` if place_id does not exist
-- Only includes current (is_current = true) source records
-- User aggregates computed from `campsite_reviews` and `favorites`
-
----
-
 ## Foreign Key Relationships
 
 ### Core Relationships
@@ -1126,6 +1094,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_unique
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260327110000_drop_get_place_source_bundle.sql` | 2026-03-27 11:00 | **BREAKING:** Drop legacy `get_place_source_bundle` RPC; use `place_resolved_public` for canonical public reads and dedicated source tables/views for provenance/debug access |
 | `20260325100000_drop_legacy_campsites_objects.sql` | 2026-03-25 10:00 | **BREAKING:** Drop legacy `campsites` table, remove deprecated `campsite_api_read_model` alias, drop orphaned `place_legacy_id_map`, and remove the unused `campsites_cache.campsite_id` back-reference |
 | `20260321000000_create_place_resolved_views.sql` | 2026-03-21 00:00 | Add `place_resolved_public` (google > osm > llm priority) and `place_resolved_my` (google > user > osm > llm priority via auth.uid()) views for public and authenticated place list/detail queries |
 | `20260320060000_drop_unused_job_import_and_cutover_tables.sql` | 2026-03-20 06:00 | **BREAKING:** Add/backfill OSM provenance fields on `place_osm_properties`, drop `place_osm_properties.osm_source_id`, drop `osm_source`, and remove unused job/import/cutover tables (`description_generation_jobs`, `website_scraping_jobs`, `osm_type_transitions`, `import_snapshot`, `cutover_runtime_flags`, `cutover_metric_snapshots`) |

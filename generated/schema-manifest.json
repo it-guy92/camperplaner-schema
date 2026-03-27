@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "0.0.1",
   "schema_hash": "TBD",
-  "generated_at": "2026-03-26T09:00:00Z",
+  "generated_at": "2026-03-27T09:57:43Z",
   "description": "Pinned artifact record - generated from schema migrations",
   "artifacts": [
     {
@@ -12,13 +12,13 @@
       "source_repository": "https://github.com/it-guy92/camperplaner-schema",
       "target_product": "apps/web/src/lib/database.types.ts",
       "target_worker": "src/types/database.types.ts",
-      "checksum": "TBD",
-      "status": "pending_generation"
+      "checksum": "sha256:8a3a593d2c9a1a601bbf9bd4dabd664bc032db79e63335c02143750908d701eb",
+      "status": "generated"
     }
   ],
   "migrations": {
-    "latest": "20260326090000",
-    "count": 46,
+    "latest": "20260327110000",
+    "count": 47,
     "pending_transfer": []
   },
   "contract_version": "1.0.0"

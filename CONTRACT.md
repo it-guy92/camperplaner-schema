@@ -112,5 +112,5 @@ For existing schema artifacts in product repo:
 
 ---
 
-**Latest migration reference:** `20260326090000_create_place_media_assets.sql`
-**Last Updated:** 2026-03-26
+**Latest migration reference:** `20260327110000_drop_get_place_source_bundle.sql`
+**Last Updated:** 2026-03-27
