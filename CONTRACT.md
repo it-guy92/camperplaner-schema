@@ -112,5 +112,5 @@ For existing schema artifacts in product repo:
 
 ---
 
-**Latest migration reference:** `20260327110000_drop_get_place_source_bundle.sql`
-**Last Updated:** 2026-03-27
+**Latest migration reference:** `20260328110000_add_premium_billing_and_entitlements.sql`
+**Last Updated:** 2026-03-28

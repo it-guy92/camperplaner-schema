@@ -2465,6 +2465,135 @@ export interface Database {
           updated_at?: string
         }
       }
+      billing_customers: {
+        Row: {
+          id: string
+          user_id: string
+          provider: string
+          provider_customer_id: string
+          email_snapshot: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          user_id: string
+          provider: string
+          provider_customer_id: string
+          email_snapshot?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          provider?: string
+          provider_customer_id?: string
+          email_snapshot?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      billing_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          billing_customer_id: string
+          provider: string
+          provider_subscription_id: string
+          provider_price_id: string | null
+          plan_code: string
+          status: string
+          current_period_start: string | null
+          current_period_end: string | null
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          trial_end: string | null
+          last_webhook_event_id: string | null
+          last_synced_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          user_id: string
+          billing_customer_id: string
+          provider: string
+          provider_subscription_id: string
+          provider_price_id?: string | null
+          plan_code: string
+          status: string
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end: boolean
+          canceled_at?: string | null
+          trial_end?: string | null
+          last_webhook_event_id?: string | null
+          last_synced_at: string
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          billing_customer_id?: string
+          provider?: string
+          provider_subscription_id?: string
+          provider_price_id?: string | null
+          plan_code?: string
+          status?: string
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          trial_end?: string | null
+          last_webhook_event_id?: string | null
+          last_synced_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      user_entitlements: {
+        Row: {
+          id: string
+          user_id: string
+          plan_code: string
+          is_premium: boolean
+          features: Json
+          limits: Json
+          source_subscription_id: string | null
+          effective_from: string
+          effective_until: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          user_id: string
+          plan_code: string
+          is_premium: boolean
+          features: Json
+          limits: Json
+          source_subscription_id?: string | null
+          effective_from: string
+          effective_until?: string | null
+          created_at: string
+          updated_at: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plan_code?: string
+          is_premium?: boolean
+          features?: Json
+          limits?: Json
+          source_subscription_id?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       geography_columns: {
