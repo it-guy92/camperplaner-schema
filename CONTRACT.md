@@ -112,5 +112,5 @@ For existing schema artifacts in product repo:
 
 ---
 
-**Latest migration reference:** `20260328110000_add_premium_billing_and_entitlements.sql`
-**Last Updated:** 2026-03-28
+**Latest migration reference:** `20260330150000_drop_trip_stops_image.sql`
+**Last Updated:** 2026-03-30

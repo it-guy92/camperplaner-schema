@@ -1,8 +1,8 @@
 # CamperPlaner ER Diagram
 
 > **Schema Repository:** Canonical source of truth
-> **Generated:** 2026-03-18
-> **Migration Head:** 20260319083000_drop_llm_enrichments_and_google_sources.sql
+> **Generated:** 2026-03-30
+> **Migration Head:** 20260330150000_drop_trip_stops_image.sql
 
 ---
 
@@ -59,7 +59,6 @@ erDiagram
         string name
         numeric rating
         string website
-        string image
         text[] amenities
         integer order_index
         string cost_type
