@@ -1,8 +1,8 @@
 # CamperPlaner Database Schema
 
 > **Location:** This is the canonical source of truth for the CamperPlaner database schema.
-> **Generated:** 2026-03-21
-> **Migration Head:** 20260321000000_create_place_resolved_views.sql
+> **Generated:** 2026-03-30
+> **Migration Head:** 20260330150000_drop_trip_stops_image.sql
 
 ---
 
@@ -539,7 +539,6 @@ Stops within trips.
 | `name` | text | NULL | Stop name |
 | `rating` | numeric | NULL | User rating |
 | `website` | text | NULL | Website URL |
-| `image` | text | NULL | Image URL |
 | `amenities` | text[] | DEFAULT '{}' | Array of amenities |
 | `order_index` | integer | DEFAULT 0 | Display order |
 | `cost_type` | text | DEFAULT 'per_night' | Cost type enum |
@@ -1094,6 +1093,7 @@ CREATE UNIQUE INDEX uidx_osm_properties_place_unique
 
 | Migration | Date | Description |
 |-----------|------|-------------|
+| `20260330150000_drop_trip_stops_image.sql` | 2026-03-30 15:00 | **BREAKING:** Drop legacy `trip_stops.image` snapshot column; trip stop media must resolve from canonical place references instead of persisted trip-level image URLs |
 | `20260327110000_drop_get_place_source_bundle.sql` | 2026-03-27 11:00 | **BREAKING:** Drop legacy `get_place_source_bundle` RPC; use `place_resolved_public` for canonical public reads and dedicated source tables/views for provenance/debug access |
 | `20260325100000_drop_legacy_campsites_objects.sql` | 2026-03-25 10:00 | **BREAKING:** Drop legacy `campsites` table, remove deprecated `campsite_api_read_model` alias, drop orphaned `place_legacy_id_map`, and remove the unused `campsites_cache.campsite_id` back-reference |
 | `20260321000000_create_place_resolved_views.sql` | 2026-03-21 00:00 | Add `place_resolved_public` (google > osm > llm priority) and `place_resolved_my` (google > user > osm > llm priority via auth.uid()) views for public and authenticated place list/detail queries |

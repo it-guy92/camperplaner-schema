@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "0.0.1",
   "schema_hash": "sha256:15901ce95f0d1a2e0c1ff40d5cd94e7e3a53121580da5e378bf9246b8deb4af1",
-  "generated_at": "2026-03-28T23:00:53Z",
+  "generated_at": "2026-03-30T15:00:00Z",
   "description": "Pinned artifact record - generated from schema migrations",
   "artifacts": [
     {
@@ -13,12 +13,12 @@
       "target_product": "apps/web/src/lib/database.types.ts",
       "target_worker": "src/types/database.types.ts",
       "checksum": "sha256:c9c0c39eb4ce6d4eb6dde465f9db085dd5df24e2155781c3db8131997de58519",
-      "status": "generated"
+      "status": "pending_generation"
     }
   ],
   "migrations": {
-    "latest": "20260328110000",
-    "count": 47,
+    "latest": "20260330150000",
+    "count": 48,
     "pending_transfer": []
   },
   "contract_version": "1.0.0"
